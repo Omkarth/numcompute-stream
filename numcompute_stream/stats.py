@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections
 import numpy as np
 
 from .utils import check_array
@@ -210,4 +211,175 @@ class RunningStats:
     def __repr__(self) -> str:
         return (
             f"RunningStats(n_features={self._n_features}, count={self._count})"
+        )
+
+
+class StreamingHistogram:
+    """Fixed-bin streaming histogram with optional sliding window.
+
+    Bin edges are evenly spaced over ``range``.  Values outside the range are
+    clamped into the nearest edge bin rather than discarded, so ``total``
+    always equals the number of observations passed to ``update``.
+
+    Parameters
+    ----------
+    n_bins : int
+        Number of equal-width bins (≥ 1).
+    range : tuple[float, float]
+        ``(low, high)`` — inclusive bounds.  Must satisfy ``low < high``.
+    max_samples : int | None
+        When set, only the most-recent ``max_samples`` values are retained.
+        Evicted values are removed from their bin counts so that ``total``
+        never exceeds ``max_samples``.
+
+    Examples
+    --------
+    >>> h = StreamingHistogram(n_bins=10, range=(0.0, 1.0))
+    >>> h.update(np.linspace(0, 1, 100))
+    >>> h.quantile(0.5)
+    0.5
+    """
+
+    def __init__(
+        self,
+        n_bins: int,
+        range: tuple[float, float],
+        max_samples: int | None = None,
+    ) -> None:
+        if n_bins < 1:
+            raise ValueError(f"n_bins must be ≥ 1; got {n_bins}")
+        lo, hi = float(range[0]), float(range[1])
+        if lo >= hi:
+            raise ValueError(f"range must satisfy low < high; got ({lo}, {hi})")
+        if max_samples is not None and max_samples < 1:
+            raise ValueError(f"max_samples must be ≥ 1; got {max_samples}")
+
+        self._n_bins = n_bins
+        self._lo = lo
+        self._hi = hi
+        self._max_samples = max_samples
+        self._bin_width = (hi - lo) / n_bins
+        self._counts = np.zeros(n_bins, dtype=np.int64)
+        self._bin_edges = np.linspace(lo, hi, n_bins + 1)
+
+        self._window: collections.deque | None = (
+            collections.deque() if max_samples is not None else None
+        )
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def update(self, values: np.ndarray) -> "StreamingHistogram":
+        """Incorporate new observations.
+
+        Parameters
+        ----------
+        values : array-like, 1-D
+            NaN values are not allowed.
+
+        Returns
+        -------
+        self
+        """
+        values = np.asarray(values, dtype=np.float64).ravel()
+        if np.any(np.isnan(values)):
+            raise ValueError("values contains NaN")
+
+        indices = self._to_bin_indices(values)
+
+        if self._window is not None:
+            for idx in indices.tolist():
+                if len(self._window) >= self._max_samples:
+                    self._counts[self._window.popleft()] -= 1
+                self._window.append(idx)
+                self._counts[idx] += 1
+        else:
+            self._counts += np.bincount(indices, minlength=self._n_bins)
+
+        return self
+
+    def reset(self) -> "StreamingHistogram":
+        """Clear all accumulated state."""
+        self._counts[:] = 0
+        if self._window is not None:
+            self._window.clear()
+        return self
+
+    def quantile(self, q: float) -> float:
+        """Approximate the q-th quantile via CDF inversion.
+
+        Uses linear interpolation within the bin where the CDF crosses *q*.
+
+        Parameters
+        ----------
+        q : float in [0, 1]
+
+        Returns
+        -------
+        float : estimated quantile value
+
+        Raises
+        ------
+        ValueError : if no data has been observed, or q is outside [0, 1].
+        """
+        total = int(self._counts.sum())
+        if total == 0:
+            raise ValueError("Cannot compute quantile — no data observed yet.")
+        if not (0.0 <= q <= 1.0):
+            raise ValueError(f"q must be in [0, 1]; got {q}")
+
+        cdf = np.cumsum(self._counts) / total
+
+        bin_idx = int(np.searchsorted(cdf, q, side="left"))
+        bin_idx = min(bin_idx, self._n_bins - 1)
+
+        lo_cdf = float(cdf[bin_idx - 1]) if bin_idx > 0 else 0.0
+        hi_cdf = float(cdf[bin_idx])
+        bin_lo = self._bin_edges[bin_idx]
+        bin_hi = self._bin_edges[bin_idx + 1]
+
+        if hi_cdf <= lo_cdf:
+            return float((bin_lo + bin_hi) / 2.0)
+
+        t = (q - lo_cdf) / (hi_cdf - lo_cdf)
+        return float(bin_lo + t * (bin_hi - bin_lo))
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def bin_edges(self) -> np.ndarray:
+        """Bin boundary positions, shape ``(n_bins + 1,)``."""
+        return self._bin_edges.copy()
+
+    @property
+    def bin_centers(self) -> np.ndarray:
+        """Mid-point of each bin, shape ``(n_bins,)``."""
+        return (self._bin_edges[:-1] + self._bin_edges[1:]) / 2.0
+
+    @property
+    def counts(self) -> np.ndarray:
+        """Observation count per bin, shape ``(n_bins,)``."""
+        return self._counts.copy()
+
+    @property
+    def total(self) -> int:
+        """Number of observations currently tracked."""
+        return int(self._counts.sum())
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _to_bin_indices(self, values: np.ndarray) -> np.ndarray:
+        indices = np.floor((values - self._lo) / self._bin_width).astype(np.intp)
+        np.clip(indices, 0, self._n_bins - 1, out=indices)
+        return indices
+
+    def __repr__(self) -> str:
+        return (
+            f"StreamingHistogram(n_bins={self._n_bins}, "
+            f"range=({self._lo}, {self._hi}), total={self.total})"
         )

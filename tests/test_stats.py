@@ -1,11 +1,11 @@
-"""Tests for numcompute_stream.stats — RunningStats (Welford)."""
+"""Tests for numcompute_stream.stats — RunningStats (Welford) and StreamingHistogram."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from numcompute_stream.stats import RunningStats
+from numcompute_stream.stats import RunningStats, StreamingHistogram
 
 
 # ---------------------------------------------------------------------------
@@ -165,3 +165,62 @@ class TestRunningStatsMerge:
         rs2 = _make_rs(np.ones((5, 3)))
         with pytest.raises(ValueError, match="n_features"):
             rs1.merge(rs2)
+
+
+# ---------------------------------------------------------------------------
+# StreamingHistogram
+# ---------------------------------------------------------------------------
+
+class TestStreamingHistogram:
+    def test_empty_histogram_quantile_raises(self):
+        h = StreamingHistogram(n_bins=10, range=(0.0, 1.0))
+        with pytest.raises(ValueError, match="no data"):
+            h.quantile(0.5)
+
+    def test_counts_sum_to_total(self):
+        rng = np.random.default_rng(42)
+        h = StreamingHistogram(n_bins=20, range=(0.0, 1.0))
+        data = rng.uniform(0, 1, 500)
+        h.update(data)
+        assert h.total == 500
+        assert int(h.counts.sum()) == 500
+
+    def test_single_bin_all_values_counted(self):
+        h = StreamingHistogram(n_bins=1, range=(0.0, 10.0))
+        h.update(np.array([1.0, 5.0, 9.0]))
+        assert h.counts[0] == 3
+        assert h.total == 3
+
+    def test_out_of_range_values_clamped_to_edge_bins(self):
+        h = StreamingHistogram(n_bins=5, range=(0.0, 5.0))
+        h.update(np.array([-10.0, -1.0, 6.0, 100.0]))
+        assert h.counts[0] == 2   # values below range go to first bin
+        assert h.counts[-1] == 2  # values above range go to last bin
+        assert h.total == 4
+
+    def test_quantile_accuracy_uniform(self):
+        rng = np.random.default_rng(7)
+        data = rng.uniform(0, 1, 10_000)
+        h = StreamingHistogram(n_bins=100, range=(0.0, 1.0))
+        h.update(data)
+        for q in [0.1, 0.25, 0.5, 0.75, 0.9]:
+            expected = float(np.quantile(data, q))
+            got = h.quantile(q)
+            assert abs(got - expected) < 0.02, f"q={q}: got {got:.4f}, expected {expected:.4f}"
+
+    def test_sliding_window_evicts_old_values(self):
+        h = StreamingHistogram(n_bins=10, range=(0.0, 10.0), max_samples=5)
+        h.update(np.zeros(5))          # fill window: all in bin 0
+        h.update(np.full(5, 9.5))     # evicts zeros; all in bin 9
+        assert h.counts[0] == 0
+        assert h.counts[-1] == 5
+        assert h.total == 5
+
+    def test_reset_clears_counts_and_raises_on_quantile(self):
+        h = StreamingHistogram(n_bins=10, range=(0.0, 1.0))
+        h.update(np.linspace(0, 1, 50))
+        h.reset()
+        assert h.total == 0
+        np.testing.assert_array_equal(h.counts, np.zeros(10, dtype=np.int64))
+        with pytest.raises(ValueError, match="no data"):
+            h.quantile(0.5)
