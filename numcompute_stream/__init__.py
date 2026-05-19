@@ -10,9 +10,11 @@ from .metrics import (
     StreamingConfusionMatrix,
 )
 from .preprocessing import Imputer, OneHotEncoder, StandardScaler
+from .tree import HoeffdingTreeClassifier
 
 __all__ = [
     "Accuracy",
+    "HoeffdingTreeClassifier",
     "Imputer",
     "OneHotEncoder",
     "PrecisionRecallF1",

@@ -1,0 +1,273 @@
+"""Tests for numcompute_stream.tree — structure and leaf statistics."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from numcompute_stream.tree import (
+    HoeffdingTreeClassifier,
+    LeafStats,
+    Node,
+    _entropy,
+    _gini,
+)
+
+
+# ---------------------------------------------------------------------------
+# Impurity functions
+# ---------------------------------------------------------------------------
+
+class TestGini:
+    def test_pure_node(self):
+        counts = np.array([10.0, 0.0])
+        assert _gini(counts) == pytest.approx(0.0)
+
+    def test_uniform_binary(self):
+        counts = np.array([5.0, 5.0])
+        assert _gini(counts) == pytest.approx(0.5)
+
+    def test_uniform_three_class(self):
+        counts = np.array([4.0, 4.0, 4.0])
+        # 1 - 3*(1/3)^2 = 1 - 1/3 = 2/3
+        assert _gini(counts) == pytest.approx(2 / 3)
+
+    def test_empty_counts(self):
+        assert _gini(np.array([0.0, 0.0])) == pytest.approx(0.0)
+
+
+class TestEntropy:
+    def test_pure_node(self):
+        counts = np.array([10.0, 0.0])
+        assert _entropy(counts) == pytest.approx(0.0)
+
+    def test_uniform_binary(self):
+        counts = np.array([5.0, 5.0])
+        assert _entropy(counts) == pytest.approx(1.0)
+
+    def test_uniform_three_class(self):
+        counts = np.array([3.0, 3.0, 3.0])
+        # -3 * (1/3)*log2(1/3) = log2(3)
+        assert _entropy(counts) == pytest.approx(np.log2(3))
+
+    def test_empty_counts(self):
+        assert _entropy(np.array([0.0, 0.0])) == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Node
+# ---------------------------------------------------------------------------
+
+class TestNode:
+    def test_new_node_is_leaf(self):
+        stats = LeafStats(n_features=3)
+        node = Node(leaf_stats=stats, depth=0)
+        assert node.is_leaf
+        assert node.leaf_stats is stats
+        assert node.split_feature is None
+
+    def test_to_internal_flips_is_leaf(self):
+        stats = LeafStats(n_features=2)
+        node = Node(leaf_stats=stats, depth=0)
+
+        left = Node(leaf_stats=LeafStats(n_features=2), depth=1)
+        right = Node(leaf_stats=LeafStats(n_features=2), depth=1)
+
+        node.to_internal(
+            split_feature=1,
+            split_threshold=0.5,
+            left_child=left,
+            right_child=right,
+        )
+
+        assert not node.is_leaf
+        assert node.split_feature == 1
+        assert node.split_threshold == pytest.approx(0.5)
+        assert node.leaf_stats is None
+        assert node.left_child is left
+        assert node.right_child is right
+
+    def test_depth_stored(self):
+        node = Node(depth=3)
+        assert node.depth == 3
+
+
+# ---------------------------------------------------------------------------
+# LeafStats
+# ---------------------------------------------------------------------------
+
+class TestLeafStats:
+    def test_empty_majority_class_is_none(self):
+        ls = LeafStats(n_features=2)
+        assert ls.majority_class() is None
+
+    def test_accumulation_single_class(self):
+        ls = LeafStats(n_features=2)
+        x = np.array([1.0, 2.0])
+        for _ in range(5):
+            ls.update(x, label=0)
+        assert ls.n_samples == 5
+        assert ls.class_counts == {0: 5}
+        assert ls.majority_class() == 0
+
+    def test_accumulation_two_classes(self):
+        ls = LeafStats(n_features=2)
+        for _ in range(3):
+            ls.update(np.array([1.0, 0.5]), label=0)
+        for _ in range(7):
+            ls.update(np.array([2.0, 1.5]), label=1)
+        assert ls.n_samples == 10
+        assert ls.class_counts == {0: 3, 1: 7}
+        assert ls.majority_class() == 1
+
+    def test_feature_stats_populated(self):
+        ls = LeafStats(n_features=2)
+        xs = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+        for x in xs:
+            ls.update(x, label=0)
+        rs = ls.get_feature_stats(0, 0)
+        assert rs is not None
+        assert rs.count == 3
+        assert rs.mean == pytest.approx(np.array([3.0]))
+
+    def test_nan_skips_feature_stats(self):
+        ls = LeafStats(n_features=2)
+        ls.update(np.array([np.nan, 2.0]), label=0)
+        # NaN feature 0 → no RunningStats for (0, 0)
+        assert ls.get_feature_stats(0, 0) is None
+        # Feature 1 should still be tracked
+        assert ls.get_feature_stats(1, 0) is not None
+        assert ls.n_samples == 1
+        assert ls.class_counts == {0: 1}
+
+    def test_nan_sample_counted(self):
+        ls = LeafStats(n_features=3)
+        ls.update(np.array([np.nan, np.nan, np.nan]), label=1)
+        assert ls.n_samples == 1
+        assert ls.class_counts == {1: 1}
+
+    def test_split_eligible_threshold(self):
+        ls = LeafStats(n_features=1, grace_period=5)
+        x = np.array([1.0])
+        assert not ls.split_eligible
+        for _ in range(5):
+            ls.update(x, label=0)
+        assert ls.split_eligible
+
+    def test_class_counts_array_aligned(self):
+        ls = LeafStats(n_features=1)
+        for _ in range(3):
+            ls.update(np.array([0.0]), label=0)
+        for _ in range(7):
+            ls.update(np.array([1.0]), label=2)
+        classes = np.array([0, 1, 2])
+        arr = ls.class_counts_array(classes)
+        np.testing.assert_array_equal(arr, [3.0, 0.0, 7.0])
+
+
+# ---------------------------------------------------------------------------
+# HoeffdingTreeClassifier — structure and partial_fit stub
+# ---------------------------------------------------------------------------
+
+class TestHoeffdingTreeClassifier:
+    def test_init_defaults(self):
+        clf = HoeffdingTreeClassifier()
+        assert clf.criterion == "gini"
+        assert clf.delta == pytest.approx(1e-7)
+        assert clf.max_depth is None
+
+    def test_invalid_criterion_raises(self):
+        with pytest.raises(ValueError, match="criterion"):
+            HoeffdingTreeClassifier(criterion="mse")
+
+    def test_predict_before_fit_raises(self):
+        clf = HoeffdingTreeClassifier()
+        with pytest.raises(ValueError, match="partial_fit"):
+            clf.predict(np.array([[1.0, 2.0]]))
+
+    def test_predict_root_leaf_returns_majority(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.array([[1.0, 2.0]] * 7 + [[3.0, 4.0]] * 3)
+        y = np.array([0] * 7 + [1] * 3)
+        clf.partial_fit(X, y)
+        preds = clf.predict(X)
+        # Only one leaf — everyone gets majority class 0
+        assert np.all(preds == 0)
+
+    def test_predict_minority_samples_still_majority(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.ones((10, 2))
+        y = np.array([1, 1, 1, 0, 0, 0, 0, 0, 0, 0])  # class 0 is majority
+        clf.partial_fit(X, y)
+        preds = clf.predict(np.ones((5, 2)))
+        assert np.all(preds == 0)
+
+    def test_partial_fit_updates_leaf_counts(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.random.default_rng(0).standard_normal((20, 3))
+        y = np.array([0] * 12 + [1] * 8)
+        clf.partial_fit(X, y)
+        leaf = clf._root
+        assert leaf.is_leaf
+        assert leaf.leaf_stats.n_samples == 20
+        counts = leaf.leaf_stats.class_counts
+        assert counts[0] == 12
+        assert counts[1] == 8
+
+    def test_partial_fit_two_chunks(self):
+        clf = HoeffdingTreeClassifier()
+        X1 = np.ones((5, 2))
+        y1 = np.zeros(5, dtype=int)
+        X2 = np.ones((5, 2)) * 2
+        y2 = np.ones(5, dtype=int)
+        clf.partial_fit(X1, y1)
+        clf.partial_fit(X2, y2)
+        assert clf._root.leaf_stats.n_samples == 10
+        counts = clf._root.leaf_stats.class_counts
+        assert counts[0] == 5
+        assert counts[1] == 5
+
+    def test_empty_chunk_is_no_op(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.ones((4, 2))
+        y = np.array([0, 0, 1, 1])
+        clf.partial_fit(X, y)
+        # Empty chunk should not raise or change state
+        clf.partial_fit(np.empty((0, 2)), np.empty(0, dtype=int))
+        assert clf._root.leaf_stats.n_samples == 4
+
+    def test_classes_provided_on_first_call(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.ones((3, 2))
+        y = np.array([0, 0, 1])
+        clf.partial_fit(X, y, classes=np.array([0, 1, 2]))
+        assert 2 in clf._classes
+
+    def test_predict_entropy_criterion(self):
+        clf = HoeffdingTreeClassifier(criterion="entropy")
+        X = np.ones((6, 2))
+        y = np.array([0, 0, 0, 0, 1, 1])
+        clf.partial_fit(X, y)
+        preds = clf.predict(X)
+        assert np.all(preds == 0)
+
+    def test_nan_in_predict_routes_left(self):
+        clf = HoeffdingTreeClassifier()
+        # Build a tree manually with a root internal node
+        clf.partial_fit(np.ones((4, 2)), np.array([0, 0, 1, 1]))
+        # Manually create a split: root becomes internal, two leaf children
+        left = Node(leaf_stats=LeafStats(n_features=2), depth=1)
+        right = Node(leaf_stats=LeafStats(n_features=2), depth=1)
+        for _ in range(3):
+            left.leaf_stats.update(np.array([0.0, 0.0]), label=0)
+        for _ in range(3):
+            right.leaf_stats.update(np.array([1.0, 1.0]), label=1)
+        clf._root.to_internal(
+            split_feature=0,
+            split_threshold=0.5,
+            left_child=left,
+            right_child=right,
+        )
+        # NaN on split feature should go left → class 0
+        x_nan = np.array([[np.nan, 0.5]])
+        assert clf.predict(x_nan)[0] == 0
