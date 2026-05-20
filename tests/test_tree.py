@@ -1,4 +1,4 @@
-"""Tests for numcompute_stream.tree — structure and leaf statistics."""
+"""Tests for numcompute_stream.tree — structure, leaf statistics, and split logic."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from numcompute_stream.tree import (
     Node,
     _entropy,
     _gini,
+    _hoeffding_bound,
 )
 
 
@@ -271,3 +272,161 @@ class TestHoeffdingTreeClassifier:
         # NaN on split feature should go left → class 0
         x_nan = np.array([[np.nan, 0.5]])
         assert clf.predict(x_nan)[0] == 0
+
+
+# ---------------------------------------------------------------------------
+# Hoeffding bound
+# ---------------------------------------------------------------------------
+
+class TestHoeffdingBound:
+    def test_gini_formula(self):
+        # ε = sqrt(R² · ln(1/δ) / 2n), R=1 for gini
+        n, delta = 100, 1e-7
+        eps = _hoeffding_bound(n, delta, "gini", 2)
+        expected = float(np.sqrt(np.log(1.0 / delta) / (2.0 * n)))
+        assert eps == pytest.approx(expected, rel=1e-9)
+
+    def test_entropy_formula(self):
+        # R = log2(n_classes)
+        n, delta, n_cls = 200, 1e-7, 3
+        eps = _hoeffding_bound(n, delta, "entropy", n_cls)
+        R = np.log2(3)
+        expected = float(np.sqrt(R ** 2 * np.log(1.0 / delta) / (2.0 * n)))
+        assert eps == pytest.approx(expected, rel=1e-9)
+
+    def test_larger_n_gives_smaller_bound(self):
+        eps_small = _hoeffding_bound(100, 1e-7, "gini", 2)
+        eps_large = _hoeffding_bound(10_000, 1e-7, "gini", 2)
+        assert eps_large < eps_small
+
+    def test_entropy_bound_larger_than_gini_for_same_n(self):
+        # log2(3) > 1 so entropy bound > gini bound
+        eps_gini = _hoeffding_bound(500, 1e-7, "gini", 3)
+        eps_ent = _hoeffding_bound(500, 1e-7, "entropy", 3)
+        assert eps_ent > eps_gini
+
+
+# ---------------------------------------------------------------------------
+# Split decision tests
+# ---------------------------------------------------------------------------
+
+class TestSplitDecision:
+    def _separable_data(self, rng, n=2000):
+        """2-class data: feature 0 is informative, features 1-3 are noise."""
+        half = n // 2
+        X0 = np.column_stack([
+            rng.normal(-3.0, 0.3, half),
+            rng.normal(0.0, 1.0, (half, 3)),
+        ])
+        X1 = np.column_stack([
+            rng.normal(3.0, 0.3, half),
+            rng.normal(0.0, 1.0, (half, 3)),
+        ])
+        X = np.vstack([X0, X1])
+        y = np.array([0] * half + [1] * half)
+        return X, y
+
+    def test_split_fires_when_clearly_separable(self):
+        rng = np.random.default_rng(42)
+        X, y = self._separable_data(rng, n=2000)
+        clf = HoeffdingTreeClassifier(
+            grace_period=200, min_samples_split=200, delta=1e-7, tau=0.05
+        )
+        clf.partial_fit(X, y)
+        assert not clf._root.is_leaf, "Expected a split on clearly separable data"
+
+    def test_split_fires_on_informative_feature(self):
+        rng = np.random.default_rng(7)
+        X, y = self._separable_data(rng, n=3000)
+        clf = HoeffdingTreeClassifier(
+            grace_period=200, min_samples_split=200, delta=1e-7, tau=0.05
+        )
+        clf.partial_fit(X, y)
+        assert not clf._root.is_leaf
+        # Feature 0 is the informative one; split should be on it
+        assert clf._root.split_feature == 0
+
+    def test_split_waits_when_eps_large(self):
+        # Only 50 samples, default delta → eps ≈ 0.4; random data → gains ≈ 0
+        rng = np.random.default_rng(0)
+        n = 50
+        X = rng.standard_normal((n, 4))
+        y = rng.integers(0, 2, n)
+        clf = HoeffdingTreeClassifier(
+            grace_period=50, min_samples_split=50, delta=1e-7, tau=0.001
+        )
+        clf.partial_fit(X, y)
+        # With tiny tau (0.001) and large eps, neither condition should fire
+        assert clf._root.is_leaf, "Should not split when eps is large and gains are random"
+
+    def test_tau_breaking_fires_when_eps_small(self):
+        # Enough data to make eps < tau, any positive gain triggers split
+        rng = np.random.default_rng(1)
+        X, y = self._separable_data(rng, n=3000)
+        # Very large tau so tau-breaking is easy to trigger
+        clf = HoeffdingTreeClassifier(
+            grace_period=200, min_samples_split=200, delta=1e-7, tau=0.99
+        )
+        clf.partial_fit(X, y)
+        assert not clf._root.is_leaf
+
+    def test_max_depth_respected(self):
+        rng = np.random.default_rng(3)
+        X, y = self._separable_data(rng, n=3000)
+        clf = HoeffdingTreeClassifier(
+            max_depth=0, grace_period=200, min_samples_split=200
+        )
+        clf.partial_fit(X, y)
+        assert clf._root.is_leaf, "max_depth=0 means root must stay a leaf"
+
+    def test_min_samples_split_respected(self):
+        rng = np.random.default_rng(4)
+        X, y = self._separable_data(rng, n=400)
+        # min_samples_split larger than total data
+        clf = HoeffdingTreeClassifier(
+            min_samples_split=10_000, grace_period=200
+        )
+        clf.partial_fit(X, y)
+        assert clf._root.is_leaf, "Should not split before min_samples_split is reached"
+
+    def test_end_to_end_streaming_accuracy_improves(self):
+        rng = np.random.default_rng(99)
+        n_total = 3000
+        half = n_total // 2
+        X = np.column_stack([
+            np.concatenate([rng.normal(-2.0, 0.5, half), rng.normal(2.0, 0.5, half)]),
+            rng.normal(0.0, 1.0, n_total),
+            rng.normal(0.0, 1.0, n_total),
+            rng.normal(0.0, 1.0, n_total),
+        ])
+        y = np.array([0] * half + [1] * half, dtype=np.int64)
+
+        # Shuffle
+        idx = rng.permutation(n_total)
+        X, y = X[idx], y[idx]
+
+        clf = HoeffdingTreeClassifier(
+            grace_period=200, min_samples_split=200, delta=1e-7
+        )
+        chunk = 500
+        for start in range(0, n_total, chunk):
+            clf.partial_fit(X[start:start + chunk], y[start:start + chunk])
+
+        preds = clf.predict(X)
+        accuracy = float((preds == y).mean())
+        assert accuracy > 0.80, f"Expected accuracy > 0.80; got {accuracy:.3f}"
+        assert not clf._root.is_leaf, "Tree should have split at least once"
+
+    def test_nan_inputs_during_partial_fit_no_crash(self):
+        rng = np.random.default_rng(5)
+        X = rng.standard_normal((300, 4))
+        y = (X[:, 0] > 0).astype(int)
+
+        # Inject NaNs into random positions
+        nan_mask = rng.random(X.shape) < 0.15
+        X[nan_mask] = np.nan
+
+        clf = HoeffdingTreeClassifier(grace_period=100, min_samples_split=100)
+        clf.partial_fit(X, y)   # must not raise
+        preds = clf.predict(X)
+        assert preds.shape == (300,)
