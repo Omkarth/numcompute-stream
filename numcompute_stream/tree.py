@@ -472,6 +472,74 @@ class HoeffdingTreeClassifier(BaseEstimator):
             out[i] = mc if mc is not None else int(self._classes[0])
         return out
 
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Return per-class probability estimates for each sample in *X*.
+
+        Returns an array of shape ``(n_samples, n_classes)``.  Probabilities
+        at each leaf are ``class_counts[c] / leaf_stats.n_samples``.  An empty
+        leaf yields a uniform distribution.
+        """
+        if self._root is None:
+            raise ValueError("Call partial_fit before predict_proba.")
+
+        X = np.asarray(X, dtype=np.float64)
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+
+        n_classes = len(self._classes)
+        out = np.zeros((X.shape[0], n_classes), dtype=np.float64)
+
+        for i in range(X.shape[0]):
+            leaf = self._route_to_leaf(X[i])
+            stats = leaf.leaf_stats
+            if stats.n_samples == 0:
+                out[i] = 1.0 / n_classes
+            else:
+                counts = stats.class_counts_array(self._classes)
+                out[i] = counts / stats.n_samples
+
+        return out
+
+    # ------------------------------------------------------------------
+    # Tree structure introspection
+    # ------------------------------------------------------------------
+
+    @property
+    def tree_depth(self) -> int:
+        """Depth of the deepest leaf; 0 for an unfit or root-only tree."""
+        if self._root is None:
+            return 0
+        return self._subtree_depth(self._root)
+
+    @property
+    def n_leaves(self) -> int:
+        """Number of leaf nodes; 0 if the tree has not been fit."""
+        if self._root is None:
+            return 0
+        return self._count_leaves(self._root)
+
+    @property
+    def n_nodes(self) -> int:
+        """Total node count (leaves + internal); 0 if unfit."""
+        if self._root is None:
+            return 0
+        return self._count_nodes(self._root)
+
+    def _subtree_depth(self, node: Node) -> int:
+        if node.is_leaf:
+            return node.depth
+        return max(self._subtree_depth(node.left_child), self._subtree_depth(node.right_child))
+
+    def _count_leaves(self, node: Node) -> int:
+        if node.is_leaf:
+            return 1
+        return self._count_leaves(node.left_child) + self._count_leaves(node.right_child)
+
+    def _count_nodes(self, node: Node) -> int:
+        if node.is_leaf:
+            return 1
+        return 1 + self._count_nodes(node.left_child) + self._count_nodes(node.right_child)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

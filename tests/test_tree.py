@@ -430,3 +430,104 @@ class TestSplitDecision:
         clf.partial_fit(X, y)   # must not raise
         preds = clf.predict(X)
         assert preds.shape == (300,)
+
+
+# ---------------------------------------------------------------------------
+# predict_proba
+# ---------------------------------------------------------------------------
+
+class TestPredictProba:
+    def test_shape_and_prob_sum(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.ones((10, 3))
+        y = np.array([0, 0, 0, 1, 1, 1, 0, 1, 0, 1])
+        clf.partial_fit(X, y)
+        proba = clf.predict_proba(X)
+        assert proba.shape == (10, 2)
+        np.testing.assert_allclose(proba.sum(axis=1), np.ones(10))
+        assert (proba >= 0).all() and (proba <= 1).all()
+
+    def test_root_leaf_only(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.ones((5, 2))
+        y = np.array([0, 0, 0, 1, 1])
+        clf.partial_fit(X, y)
+        assert clf._root.is_leaf
+        proba = clf.predict_proba(X)
+        # All samples land at the same leaf: 3/5 class-0, 2/5 class-1
+        np.testing.assert_allclose(proba[:, 0], 0.6)
+        np.testing.assert_allclose(proba[:, 1], 0.4)
+
+    def test_different_proba_after_split(self):
+        rng = np.random.default_rng(42)
+        half = 1000
+        X0 = np.column_stack([rng.normal(-3.0, 0.3, half), rng.normal(0.0, 1.0, (half, 2))])
+        X1 = np.column_stack([rng.normal(3.0, 0.3, half), rng.normal(0.0, 1.0, (half, 2))])
+        X = np.vstack([X0, X1])
+        y = np.array([0] * half + [1] * half)
+        clf = HoeffdingTreeClassifier(grace_period=200, min_samples_split=200, delta=1e-7)
+        clf.partial_fit(X, y)
+        assert not clf._root.is_leaf, "Expected a split"
+        proba = clf.predict_proba(X)
+        # Class-0 samples should have higher P(class=0) than class-1 samples
+        p0_for_class0 = proba[:half, 0].mean()
+        p0_for_class1 = proba[half:, 0].mean()
+        assert p0_for_class0 > p0_for_class1
+
+    def test_predict_proba_before_fit_raises(self):
+        clf = HoeffdingTreeClassifier()
+        with pytest.raises(ValueError, match="partial_fit"):
+            clf.predict_proba(np.array([[1.0, 2.0]]))
+
+
+# ---------------------------------------------------------------------------
+# Tree introspection properties
+# ---------------------------------------------------------------------------
+
+class TestTreeIntrospection:
+    def test_unfit_tree_all_zero(self):
+        clf = HoeffdingTreeClassifier()
+        assert clf.tree_depth == 0
+        assert clf.n_leaves == 0
+        assert clf.n_nodes == 0
+
+    def test_root_only_tree(self):
+        clf = HoeffdingTreeClassifier()
+        clf.partial_fit(np.ones((5, 2)), np.array([0, 0, 1, 1, 0]))
+        assert clf._root.is_leaf
+        assert clf.tree_depth == 0
+        assert clf.n_leaves == 1
+        assert clf.n_nodes == 1
+
+    def test_binary_tree_node_identity_after_split(self):
+        rng = np.random.default_rng(7)
+        half = 1000
+        X = np.vstack([
+            np.column_stack([rng.normal(-3.0, 0.3, half), rng.normal(0.0, 1.0, (half, 2))]),
+            np.column_stack([rng.normal(3.0, 0.3, half), rng.normal(0.0, 1.0, (half, 2))]),
+        ])
+        y = np.array([0] * half + [1] * half)
+        clf = HoeffdingTreeClassifier(grace_period=200, min_samples_split=200, delta=1e-7)
+        clf.partial_fit(X, y)
+        assert not clf._root.is_leaf
+        # For any binary tree: n_nodes == 2 * n_leaves - 1
+        assert clf.n_nodes == 2 * clf.n_leaves - 1
+        assert clf.tree_depth >= 1
+
+    def test_single_class_chunk(self):
+        clf = HoeffdingTreeClassifier()
+        X = np.ones((10, 3))
+        y = np.zeros(10, dtype=int)
+        clf.partial_fit(X, y)
+        preds = clf.predict(X)
+        assert np.all(preds == 0)
+
+    def test_all_nan_feature_column_no_crash(self):
+        rng = np.random.default_rng(11)
+        X = rng.standard_normal((200, 3))
+        X[:, 1] = np.nan  # entire column is NaN
+        y = (X[:, 0] > 0).astype(int)
+        clf = HoeffdingTreeClassifier(grace_period=100, min_samples_split=100)
+        clf.partial_fit(X, y)   # must not raise
+        preds = clf.predict(X)
+        assert preds.shape == (200,)
