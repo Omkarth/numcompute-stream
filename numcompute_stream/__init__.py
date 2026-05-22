@@ -2,6 +2,7 @@
 
 __version__ = "0.1.0"
 
+from .ensemble import OnlineRandomForestClassifier
 from .metrics import (
     Accuracy,
     PrecisionRecallF1,
@@ -17,6 +18,7 @@ __all__ = [
     "HoeffdingTreeClassifier",
     "Imputer",
     "OneHotEncoder",
+    "OnlineRandomForestClassifier",
     "PrecisionRecallF1",
     "RollingMetric",
     "StandardScaler",
