@@ -2,6 +2,7 @@
 
 __version__ = "0.1.0"
 
+from .drift import ADWIN
 from .ensemble import OnlineRandomForestClassifier
 from .metrics import (
     Accuracy,
@@ -14,6 +15,7 @@ from .preprocessing import Imputer, OneHotEncoder, StandardScaler
 from .tree import HoeffdingTreeClassifier
 
 __all__ = [
+    "ADWIN",
     "Accuracy",
     "HoeffdingTreeClassifier",
     "Imputer",
