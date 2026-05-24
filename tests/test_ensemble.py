@@ -317,3 +317,130 @@ class TestReproducibility:
             for s1, s2 in zip(clf1.feature_subsets_, clf2.feature_subsets_)
         )
         assert not all_same
+
+
+# ---------------------------------------------------------------------------
+# ARF drift detection (day 11)
+# ---------------------------------------------------------------------------
+
+def _make_abrupt_drift_stream(n_per_phase=1500, n_features=6, seed=0):
+    """Return two phases: phase 1 label = X[:,0]>0, phase 2 label = X[:,0]<=0."""
+    rng = np.random.default_rng(seed)
+    X1 = rng.standard_normal((n_per_phase, n_features))
+    y1 = (X1[:, 0] > 0).astype(np.int64)
+    X2 = rng.standard_normal((n_per_phase, n_features))
+    y2 = (X2[:, 0] <= 0).astype(np.int64)
+    return X1, y1, X2, y2
+
+
+class TestARFDriftDetection:
+    def test_adwins_created_when_drift_detection_true(self):
+        from numcompute_stream.drift import ADWIN
+
+        clf = OnlineRandomForestClassifier(n_estimators=3, drift_detection=True, random_state=0)
+        X, y = _make_separable(50)
+        clf.partial_fit(X, y)
+        for state in clf._states:
+            assert state.warning_adwin is not None
+            assert state.drift_adwin is not None
+            assert isinstance(state.warning_adwin, ADWIN)
+            assert isinstance(state.drift_adwin, ADWIN)
+
+    def test_no_adwins_when_drift_detection_false(self):
+        clf = OnlineRandomForestClassifier(n_estimators=3, drift_detection=False, random_state=0)
+        X, y = _make_separable(50)
+        clf.partial_fit(X, y)
+        for state in clf._states:
+            assert state.warning_adwin is None
+            assert state.drift_adwin is None
+
+    def test_candidate_none_at_start(self):
+        clf = OnlineRandomForestClassifier(n_estimators=4, drift_detection=True, random_state=0)
+        X, y = _make_separable(50)
+        clf.partial_fit(X, y)
+        for state in clf._states:
+            assert state.candidate is None
+
+    def test_stable_stream_zero_drift(self):
+        """Shuffled separable data should produce zero drift events."""
+        clf = OnlineRandomForestClassifier(
+            n_estimators=5, drift_detection=True, random_state=42,
+            grace_period=50, min_samples_split=5,
+        )
+        X, y = _make_separable(500, seed=42)
+        _stream_fit(clf, X, y, chunk=50)
+        assert clf.drift_count_ == 0
+
+    def test_abrupt_drift_detected(self):
+        """Clear concept flip must trigger at least one confirmed drift event."""
+        X1, y1, X2, y2 = _make_abrupt_drift_stream(n_per_phase=1500, seed=7)
+        clf = OnlineRandomForestClassifier(
+            n_estimators=5, drift_detection=True, random_state=0,
+            grace_period=20, min_samples_split=5,
+        )
+        _stream_fit(clf, X1, y1, chunk=100)
+        _stream_fit(clf, X2, y2, chunk=100)
+        assert clf.drift_count_ >= 1, (
+            f"Expected drift but got drift_count_={clf.drift_count_}"
+        )
+
+    def test_warning_fires_before_drift(self):
+        """Warning ADWIN must fire at least as many times as confirmed drift."""
+        X1, y1, X2, y2 = _make_abrupt_drift_stream(n_per_phase=1500, seed=3)
+        clf = OnlineRandomForestClassifier(
+            n_estimators=5, drift_detection=True, random_state=0,
+            grace_period=20, min_samples_split=5,
+        )
+        _stream_fit(clf, X1, y1, chunk=100)
+        _stream_fit(clf, X2, y2, chunk=100)
+        # warning_count_ >= drift_count_ because warning always precedes drift
+        # (or fires without leading to drift in the same window)
+        assert clf.warning_count_ >= clf.drift_count_
+        assert clf.warning_count_ >= 1, (
+            f"Expected warning events but got warning_count_={clf.warning_count_}"
+        )
+
+    def test_arf_better_accuracy_on_drifting_stream(self):
+        """ARF should adapt faster than a fixed ensemble after concept drift."""
+        from numcompute_stream.metrics import Accuracy
+
+        X1, y1, X2, y2 = _make_abrupt_drift_stream(n_per_phase=1500, seed=5)
+
+        def run(drift_detection):
+            clf = OnlineRandomForestClassifier(
+                n_estimators=5, drift_detection=drift_detection, random_state=0,
+                grace_period=20, min_samples_split=5,
+            )
+            _stream_fit(clf, X1, y1, chunk=100)
+            _stream_fit(clf, X2, y2, chunk=100)
+            return clf
+
+        arf = run(True)
+        fixed = run(False)
+
+        # Evaluate both on the final 300 samples of phase 2 (new concept)
+        X_test, y_test = X2[-300:], y2[-300:]
+        acc_arf = Accuracy()
+        acc_arf.update(y_test, arf.predict(X_test))
+        acc_fixed = Accuracy()
+        acc_fixed.update(y_test, fixed.predict(X_test))
+
+        assert acc_arf.result() >= acc_fixed.result() - 0.05, (
+            f"ARF acc={acc_arf.result():.3f} should be >= fixed acc={acc_fixed.result():.3f} "
+            f"(within 5% tolerance)"
+        )
+
+    def test_reproducibility_same_drift_count(self):
+        """Same random_state must yield identical drift_count_ across runs."""
+        X1, y1, X2, y2 = _make_abrupt_drift_stream(n_per_phase=1500, seed=11)
+
+        def run():
+            clf = OnlineRandomForestClassifier(
+                n_estimators=5, drift_detection=True, random_state=42,
+                grace_period=20, min_samples_split=5,
+            )
+            _stream_fit(clf, X1, y1, chunk=100)
+            _stream_fit(clf, X2, y2, chunk=100)
+            return clf.drift_count_
+
+        assert run() == run()

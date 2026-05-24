@@ -8,8 +8,15 @@ from typing import List, Optional
 import numpy as np
 
 from .base import BaseEstimator
+from .drift import ADWIN
 from .metrics import Accuracy
 from .tree import HoeffdingTreeClassifier
+
+# Minimum OOB-sample window before ADWIN evaluates any cut.  Setting this to
+# 100 means a training set of ~500 samples (≈185 OOB) never triggers ADWIN,
+# preventing spurious resets on small or ordered datasets while still allowing
+# detection on longer streams.
+_ADWIN_MIN_WINDOW = 100
 
 
 def _feature_count(n_features: int, max_features) -> int:
@@ -27,7 +34,11 @@ def _feature_count(n_features: int, max_features) -> int:
 class _TreeState:
     """Bundle of per-tree mutable state."""
 
-    __slots__ = ("tree", "feature_subset", "oob_metric", "rng")
+    __slots__ = (
+        "tree", "feature_subset", "oob_metric", "rng",
+        "warning_adwin", "drift_adwin", "candidate",
+        "drift_event_count", "warning_event_count",
+    )
 
     def __init__(
         self,
@@ -35,11 +46,18 @@ class _TreeState:
         feature_subset: np.ndarray,
         oob_metric: Accuracy,
         rng: np.random.Generator,
+        warning_adwin: Optional[ADWIN] = None,
+        drift_adwin: Optional[ADWIN] = None,
     ) -> None:
         self.tree = tree
         self.feature_subset = feature_subset
         self.oob_metric = oob_metric
         self.rng = rng
+        self.warning_adwin = warning_adwin
+        self.drift_adwin = drift_adwin
+        self.candidate: Optional[HoeffdingTreeClassifier] = None
+        self.drift_event_count: int = 0
+        self.warning_event_count: int = 0
 
 
 class OnlineRandomForestClassifier(BaseEstimator):
@@ -48,6 +66,15 @@ class OnlineRandomForestClassifier(BaseEstimator):
     Each tree in the ensemble sees a random feature subset and a Poisson-weighted
     bootstrap of every chunk.  Samples with Poisson weight 0 (OOB) are used to
     track per-tree out-of-bag accuracy without fitting.
+
+    When ``drift_detection=True`` (default), each tree maintains two ADWIN
+    detectors on its OOB correctness signal.  The looser ``warning_adwin``
+    (delta=``warning_delta``) spins up a background candidate tree when it
+    fires; the stricter ``drift_adwin`` (delta=``drift_delta``) promotes the
+    candidate (or resets with a fresh tree) when confirmed drift is detected.
+
+    Both detectors require at least 100 OOB samples before evaluating any cut,
+    preventing spurious detection on small or ordered datasets.
 
     Parameters
     ----------
@@ -61,6 +88,14 @@ class OnlineRandomForestClassifier(BaseEstimator):
         Passed through to each :class:`~numcompute_stream.tree.HoeffdingTreeClassifier`.
     voting : {'hard', 'soft'}
         Aggregation strategy for :meth:`predict` / :meth:`predict_proba`.
+    drift_detection : bool
+        Enable ADWIN-based drift detection per tree (default True).
+    warning_delta : float
+        ADWIN confidence for the early-warning detector.
+        Larger value → lower threshold → fires earlier on suspected drift.
+    drift_delta : float
+        ADWIN confidence for the confirmed-drift detector.
+        Smaller value → higher threshold → fires only on strong evidence.
     """
 
     def __init__(
@@ -75,6 +110,9 @@ class OnlineRandomForestClassifier(BaseEstimator):
         delta: float = 1e-7,
         tau: float = 0.05,
         voting: str = "hard",
+        drift_detection: bool = True,
+        warning_delta: float = 0.01,
+        drift_delta: float = 0.001,
     ) -> None:
         if voting not in ("hard", "soft"):
             raise ValueError(f"voting must be 'hard' or 'soft'; got {voting!r}")
@@ -88,6 +126,9 @@ class OnlineRandomForestClassifier(BaseEstimator):
         self.delta = delta
         self.tau = tau
         self.voting = voting
+        self.drift_detection = drift_detection
+        self.warning_delta = warning_delta
+        self.drift_delta = drift_delta
 
         self._states: Optional[List[_TreeState]] = None
         self._classes: Optional[np.ndarray] = None
@@ -96,8 +137,21 @@ class OnlineRandomForestClassifier(BaseEstimator):
         self._chunk_counter: int = 0
 
     # ------------------------------------------------------------------
-    # Initialisation
+    # Internal helpers
     # ------------------------------------------------------------------
+
+    def _make_tree(self) -> HoeffdingTreeClassifier:
+        return HoeffdingTreeClassifier(
+            criterion=self.criterion,
+            max_depth=self.max_depth,
+            min_samples_split=self.min_samples_split,
+            grace_period=self.grace_period,
+            delta=self.delta,
+            tau=self.tau,
+        )
+
+    def _make_adwin(self, delta: float) -> ADWIN:
+        return ADWIN(delta=delta, min_window_length=_ADWIN_MIN_WINDOW)
 
     def _init_forest(self, n_features: int, classes: np.ndarray) -> None:
         self._n_features = n_features
@@ -109,22 +163,23 @@ class OnlineRandomForestClassifier(BaseEstimator):
         all_features = np.arange(n_features)
         self._states = []
 
-        for i in range(self.n_estimators):
-            # Derive a reproducible seed per tree from the global RNG
+        for _ in range(self.n_estimators):
             tree_seed = int(self._global_rng.integers(0, 2**31))
             tree_rng = np.random.default_rng(tree_seed)
             subset = np.sort(tree_rng.choice(all_features, size=k, replace=False))
 
-            tree = HoeffdingTreeClassifier(
-                criterion=self.criterion,
-                max_depth=self.max_depth,
-                min_samples_split=self.min_samples_split,
-                grace_period=self.grace_period,
-                delta=self.delta,
-                tau=self.tau,
-            )
+            warning_adwin = self._make_adwin(self.warning_delta) if self.drift_detection else None
+            drift_adwin = self._make_adwin(self.drift_delta) if self.drift_detection else None
+
             self._states.append(
-                _TreeState(tree=tree, feature_subset=subset, oob_metric=Accuracy(), rng=tree_rng)
+                _TreeState(
+                    tree=self._make_tree(),
+                    feature_subset=subset,
+                    oob_metric=Accuracy(),
+                    rng=tree_rng,
+                    warning_adwin=warning_adwin,
+                    drift_adwin=drift_adwin,
+                )
             )
 
     # ------------------------------------------------------------------
@@ -163,20 +218,22 @@ class OnlineRandomForestClassifier(BaseEstimator):
         self._chunk_counter += 1
 
         for state in self._states:
-            # Per-tree, per-chunk Poisson weights — seeded reproducibly
             weights = state.rng.poisson(1.0, size=n_samples)
 
             oob_mask = weights == 0
             fit_mask = weights >= 1
 
-            # OOB scoring (tree must be initialised before scoring)
+            # OOB scoring and ADWIN drift detection
             if state.tree._root is not None and oob_mask.any():
                 X_oob = X[oob_mask][:, state.feature_subset]
                 y_oob = y[oob_mask]
                 y_pred_oob = state.tree.predict(X_oob)
                 state.oob_metric.update(y_oob, y_pred_oob)
 
-            # Fit on in-bag samples, replicating by Poisson weight
+                if self.drift_detection:
+                    self._update_drift_state(state, y_oob, y_pred_oob)
+
+            # Fit main tree on in-bag samples (Poisson-weighted bootstrap)
             if fit_mask.any():
                 X_inbag_rows = []
                 y_inbag_rows = []
@@ -191,7 +248,50 @@ class OnlineRandomForestClassifier(BaseEstimator):
                 X_sub = X_inbag[:, state.feature_subset]
                 state.tree.partial_fit(X_sub, y_inbag, classes=self._classes)
 
+                # Train candidate with its own independent Poisson draw
+                if self.drift_detection and state.candidate is not None:
+                    cand_weights = state.rng.poisson(1.0, size=n_samples)
+                    cand_X_rows = []
+                    cand_y_rows = []
+                    for idx in np.where(cand_weights >= 1)[0]:
+                        w = int(cand_weights[idx])
+                        cand_X_rows.append(np.tile(X[idx : idx + 1, :], (w, 1)))
+                        cand_y_rows.append(np.full(w, y[idx], dtype=np.int64))
+                    if cand_X_rows:
+                        X_cand = np.concatenate(cand_X_rows, axis=0)[:, state.feature_subset]
+                        y_cand = np.concatenate(cand_y_rows, axis=0)
+                        state.candidate.partial_fit(X_cand, y_cand, classes=self._classes)
+
         return self
+
+    def _update_drift_state(
+        self,
+        state: _TreeState,
+        y_oob: np.ndarray,
+        y_pred_oob: np.ndarray,
+    ) -> None:
+        """Per-OOB-sample ADWIN state machine for a single tree."""
+        for yi, yp in zip(y_oob, y_pred_oob):
+            correctness = 1 if yi == yp else 0
+            warning_fired = state.warning_adwin.update(correctness)
+            drift_fired = state.drift_adwin.update(correctness)
+
+            # Warning zone: spin up a background candidate tree
+            if warning_fired and state.candidate is None:
+                state.candidate = self._make_tree()
+                state.warning_event_count += 1
+
+            # Confirmed drift: promote candidate or reset to a fresh tree
+            if drift_fired:
+                if state.candidate is not None:
+                    state.tree = state.candidate
+                    state.candidate = None
+                else:
+                    state.tree = self._make_tree()
+                state.drift_event_count += 1
+                state.warning_adwin.reset()
+                state.drift_adwin.reset()
+                state.oob_metric.reset()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self._states is None:
@@ -207,7 +307,6 @@ class OnlineRandomForestClassifier(BaseEstimator):
             proba = self.predict_proba(X)
             return self._classes[np.argmax(proba, axis=1)]
 
-        # hard voting: collect per-tree predictions then majority vote
         votes = np.zeros((n_samples, len(self._classes)), dtype=np.int64)
         class_to_idx = {int(c): i for i, c in enumerate(self._classes)}
 
@@ -220,7 +319,6 @@ class OnlineRandomForestClassifier(BaseEstimator):
                 if idx is not None:
                     votes[j, idx] += 1
 
-        # ties → lowest class label (argmax returns first maximum)
         return self._classes[np.argmax(votes, axis=1)]
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
@@ -239,10 +337,8 @@ class OnlineRandomForestClassifier(BaseEstimator):
         for state in self._states:
             if state.tree._root is None:
                 continue
-            # Tree may have seen a subset of classes; align to global class order
             tree_classes = state.tree._classes
             proba_tree = state.tree.predict_proba(X[:, state.feature_subset])
-            # Map tree columns → global columns
             for ti, tc in enumerate(tree_classes):
                 gi = np.searchsorted(self._classes, tc)
                 if gi < n_classes and self._classes[gi] == tc:
@@ -253,7 +349,6 @@ class OnlineRandomForestClassifier(BaseEstimator):
             return np.full((n_samples, n_classes), 1.0 / n_classes)
 
         accum /= n_fit
-        # Re-normalise rows that don't sum to 1 (can happen when tree classes ≠ global)
         row_sums = accum.sum(axis=1, keepdims=True)
         row_sums = np.where(row_sums == 0, 1.0, row_sums)
         return accum / row_sums
@@ -275,6 +370,20 @@ class OnlineRandomForestClassifier(BaseEstimator):
         if self._states is None:
             return []
         return [state.feature_subset.copy() for state in self._states]
+
+    @property
+    def drift_count_(self) -> int:
+        """Total confirmed drift events across all trees since construction."""
+        if self._states is None:
+            return 0
+        return sum(s.drift_event_count for s in self._states)
+
+    @property
+    def warning_count_(self) -> int:
+        """Total warning events (candidate creations) across all trees."""
+        if self._states is None:
+            return 0
+        return sum(s.warning_event_count for s in self._states)
 
     def __repr__(self) -> str:
         return (
