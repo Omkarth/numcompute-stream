@@ -16,9 +16,7 @@ from numcompute_stream.metrics import (
 )
 
 
-# ---------------------------------------------------------------------------
 # StreamingConfusionMatrix
-# ---------------------------------------------------------------------------
 
 class TestStreamingConfusionMatrix:
     def test_binary_basic(self):
@@ -103,9 +101,7 @@ class TestStreamingConfusionMatrix:
         assert mat.sum() == 4
 
 
-# ---------------------------------------------------------------------------
 # Accuracy
-# ---------------------------------------------------------------------------
 
 class TestAccuracy:
     def test_perfect_accuracy(self):
@@ -146,9 +142,7 @@ class TestAccuracy:
             acc.update(np.array([0, 1, 2]), np.array([0, 1]))
 
 
-# ---------------------------------------------------------------------------
 # PrecisionRecallF1
-# ---------------------------------------------------------------------------
 
 class TestPrecisionRecallF1:
     def test_perfect_binary(self):
@@ -205,9 +199,7 @@ class TestPrecisionRecallF1:
         assert m.result() == 0.0
 
 
-# ---------------------------------------------------------------------------
 # RollingMetric
-# ---------------------------------------------------------------------------
 
 class TestRollingMetric:
     def test_window_limits_chunks(self):
@@ -252,9 +244,7 @@ class TestRollingMetric:
             RollingMetric(Accuracy(), window_size=0)
 
 
-# ---------------------------------------------------------------------------
 # StreamingAUC
-# ---------------------------------------------------------------------------
 
 class TestStreamingAUC:
     def test_perfect_auc(self):

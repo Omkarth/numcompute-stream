@@ -8,9 +8,7 @@ import pytest
 from numcompute_stream.stats import RunningStats, StreamingHistogram
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 def _make_rs(*arrays: np.ndarray) -> RunningStats:
     rs = RunningStats()
@@ -19,9 +17,7 @@ def _make_rs(*arrays: np.ndarray) -> RunningStats:
     return rs
 
 
-# ---------------------------------------------------------------------------
 # Basic single-batch accuracy
-# ---------------------------------------------------------------------------
 
 class TestRunningStatsSingleBatch:
     def test_mean_1d(self):
@@ -58,9 +54,7 @@ class TestRunningStatsSingleBatch:
         assert rs.count == 7
 
 
-# ---------------------------------------------------------------------------
 # Incremental updates must match one-shot
-# ---------------------------------------------------------------------------
 
 class TestRunningStatsIncremental:
     def test_chunked_mean_matches_oneshot(self):
@@ -82,9 +76,7 @@ class TestRunningStatsIncremental:
         assert rs.count == 100
 
 
-# ---------------------------------------------------------------------------
 # Edge cases
-# ---------------------------------------------------------------------------
 
 class TestRunningStatsEdgeCases:
     def test_no_data_mean_raises(self):
@@ -134,9 +126,7 @@ class TestRunningStatsEdgeCases:
         np.testing.assert_allclose(rs.mean, [2.0, 3.0])
 
 
-# ---------------------------------------------------------------------------
 # Merge
-# ---------------------------------------------------------------------------
 
 class TestRunningStatsMerge:
     def test_merge_mean_equals_combined(self):
@@ -167,9 +157,7 @@ class TestRunningStatsMerge:
             rs1.merge(rs2)
 
 
-# ---------------------------------------------------------------------------
 # StreamingHistogram
-# ---------------------------------------------------------------------------
 
 class TestStreamingHistogram:
     def test_empty_histogram_quantile_raises(self):

@@ -8,9 +8,7 @@ import pytest
 from numcompute_stream.preprocessing import Imputer, OneHotEncoder, StandardScaler
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 def _make_X(seed: int = 0, n: int = 50, p: int = 3) -> np.ndarray:
     return np.random.default_rng(seed).standard_normal((n, p))

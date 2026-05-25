@@ -9,18 +9,14 @@ import numpy as np
 import pytest
 
 
-# ---------------------------------------------------------------------------
 # RNG
-# ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
 def rng() -> np.random.Generator:
     return np.random.default_rng(42)
 
 
-# ---------------------------------------------------------------------------
 # Small in-memory arrays
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def small_binary(rng) -> tuple[np.ndarray, np.ndarray]:
@@ -56,9 +52,7 @@ def chunk_stream(small_binary) -> list[tuple[np.ndarray, np.ndarray]]:
     return chunks
 
 
-# ---------------------------------------------------------------------------
 # Temporary CSV files
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def tmp_csv(tmp_path, rng) -> pathlib.Path:
@@ -98,9 +92,7 @@ def tmp_csv_with_nans(tmp_path) -> pathlib.Path:
     return p
 
 
-# ---------------------------------------------------------------------------
 # Synthetic concept-drift stream
-# ---------------------------------------------------------------------------
 
 def make_drift_stream(
     n_pre: int = 200,

@@ -15,9 +15,7 @@ from numcompute_stream.tree import (
 )
 
 
-# ---------------------------------------------------------------------------
 # Impurity functions
-# ---------------------------------------------------------------------------
 
 class TestGini:
     def test_pure_node(self):
@@ -55,9 +53,7 @@ class TestEntropy:
         assert _entropy(np.array([0.0, 0.0])) == pytest.approx(0.0)
 
 
-# ---------------------------------------------------------------------------
 # Node
-# ---------------------------------------------------------------------------
 
 class TestNode:
     def test_new_node_is_leaf(self):
@@ -93,9 +89,7 @@ class TestNode:
         assert node.depth == 3
 
 
-# ---------------------------------------------------------------------------
 # LeafStats
-# ---------------------------------------------------------------------------
 
 class TestLeafStats:
     def test_empty_majority_class_is_none(self):
@@ -166,9 +160,7 @@ class TestLeafStats:
         np.testing.assert_array_equal(arr, [3.0, 0.0, 7.0])
 
 
-# ---------------------------------------------------------------------------
 # HoeffdingTreeClassifier — structure and partial_fit stub
-# ---------------------------------------------------------------------------
 
 class TestHoeffdingTreeClassifier:
     def test_init_defaults(self):
@@ -274,9 +266,7 @@ class TestHoeffdingTreeClassifier:
         assert clf.predict(x_nan)[0] == 0
 
 
-# ---------------------------------------------------------------------------
 # Hoeffding bound
-# ---------------------------------------------------------------------------
 
 class TestHoeffdingBound:
     def test_gini_formula(self):
@@ -306,9 +296,7 @@ class TestHoeffdingBound:
         assert eps_ent > eps_gini
 
 
-# ---------------------------------------------------------------------------
 # Split decision tests
-# ---------------------------------------------------------------------------
 
 class TestSplitDecision:
     def _separable_data(self, rng, n=2000):
@@ -432,9 +420,7 @@ class TestSplitDecision:
         assert preds.shape == (300,)
 
 
-# ---------------------------------------------------------------------------
 # predict_proba
-# ---------------------------------------------------------------------------
 
 class TestPredictProba:
     def test_shape_and_prob_sum(self):
@@ -480,9 +466,7 @@ class TestPredictProba:
             clf.predict_proba(np.array([[1.0, 2.0]]))
 
 
-# ---------------------------------------------------------------------------
 # Tree introspection properties
-# ---------------------------------------------------------------------------
 
 class TestTreeIntrospection:
     def test_unfit_tree_all_zero(self):

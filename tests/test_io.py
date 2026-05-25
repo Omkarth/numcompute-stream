@@ -15,9 +15,7 @@ from numcompute_stream.io import (
 )
 
 
-# ---------------------------------------------------------------------------
 # load_csv
-# ---------------------------------------------------------------------------
 
 class TestLoadCsv:
     def test_shape(self, tmp_csv):
@@ -46,9 +44,7 @@ class TestLoadCsv:
             load_csv(tmp_csv, target_col=99)
 
 
-# ---------------------------------------------------------------------------
 # train_test_split
-# ---------------------------------------------------------------------------
 
 class TestTrainTestSplit:
     def test_sizes(self, small_binary):
@@ -84,9 +80,7 @@ class TestTrainTestSplit:
             train_test_split(X, y)
 
 
-# ---------------------------------------------------------------------------
 # stream_chunks — from in-memory arrays
-# ---------------------------------------------------------------------------
 
 class TestStreamChunksFromArrays:
     def test_chunk_count_and_sizes(self, small_binary):
@@ -118,9 +112,7 @@ class TestStreamChunksFromArrays:
         assert all(c[0].shape == (100, 4) for c in chunks)
 
 
-# ---------------------------------------------------------------------------
 # stream_chunks — from CSV file
-# ---------------------------------------------------------------------------
 
 class TestStreamChunksFromFile:
     def test_from_csv_reconstructs_data(self, tmp_csv):
@@ -134,9 +126,7 @@ class TestStreamChunksFromFile:
         assert len(chunks) == 3
 
 
-# ---------------------------------------------------------------------------
 # stream_csv_rows
-# ---------------------------------------------------------------------------
 
 class TestStreamCsvRows:
     def test_row_count(self, tmp_csv):

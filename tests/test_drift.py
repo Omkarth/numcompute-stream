@@ -12,9 +12,7 @@ from numcompute_stream.drift import ADWIN
 RNG = np.random.default_rng(42)
 
 
-# ---------------------------------------------------------------------------
 # 1. Stable stream — no drift detected
-# ---------------------------------------------------------------------------
 
 def test_stable_stream_no_drift():
     rng = np.random.default_rng(0)
@@ -24,9 +22,7 @@ def test_stable_stream_no_drift():
     assert detector.drift_count == 0
 
 
-# ---------------------------------------------------------------------------
 # 2. Abrupt drift — detected at least once
-# ---------------------------------------------------------------------------
 
 def test_abrupt_drift_detected():
     rng = np.random.default_rng(1)
@@ -41,9 +37,7 @@ def test_abrupt_drift_detected():
     assert detector.drift_count >= 1
 
 
-# ---------------------------------------------------------------------------
 # 3. Reset clears window; drift_count resets to zero
-# ---------------------------------------------------------------------------
 
 def test_reset_clears_window_and_count():
     rng = np.random.default_rng(2)
@@ -59,9 +53,7 @@ def test_reset_clears_window_and_count():
     assert detector.drift_count == 0
 
 
-# ---------------------------------------------------------------------------
 # 4. min_window_length respected — no evaluation until window is long enough
-# ---------------------------------------------------------------------------
 
 def test_min_window_length_respected():
     detector = ADWIN(delta=0.002, min_window_length=20)
@@ -71,9 +63,7 @@ def test_min_window_length_respected():
     assert detector.drift_count == 0
 
 
-# ---------------------------------------------------------------------------
 # 5. max_window_size respected — window never exceeds cap
-# ---------------------------------------------------------------------------
 
 def test_max_window_size_capped():
     cap = 200
@@ -85,9 +75,7 @@ def test_max_window_size_capped():
     assert detector.width <= cap
 
 
-# ---------------------------------------------------------------------------
 # 6. Binary stream (0/1): stable 80% accuracy → no drift; drop to 50% → drift
-# ---------------------------------------------------------------------------
 
 def test_binary_stream_oob_correctness():
     rng = np.random.default_rng(4)
@@ -106,9 +94,7 @@ def test_binary_stream_oob_correctness():
     assert drift_seen
 
 
-# ---------------------------------------------------------------------------
 # 7. mean property correctness on a small window
-# ---------------------------------------------------------------------------
 
 def test_mean_property():
     detector = ADWIN(delta=0.002, max_window_size=5000, min_window_length=2)
@@ -123,9 +109,7 @@ def test_mean_property():
         assert detector.width > 0
 
 
-# ---------------------------------------------------------------------------
 # 8. drift_count increments across multiple drifts
-# ---------------------------------------------------------------------------
 
 def test_drift_count_increments():
     rng = np.random.default_rng(5)
@@ -142,9 +126,7 @@ def test_drift_count_increments():
     assert detector.drift_count >= 2
 
 
-# ---------------------------------------------------------------------------
 # 9. Width shrinks after drift (window drops the older portion)
-# ---------------------------------------------------------------------------
 
 def test_width_shrinks_after_drift():
     rng = np.random.default_rng(6)
@@ -158,9 +140,7 @@ def test_width_shrinks_after_drift():
             break
 
 
-# ---------------------------------------------------------------------------
 # 10. Edge case: single update returns False, width == 1
-# ---------------------------------------------------------------------------
 
 def test_single_update_no_cut():
     detector = ADWIN(delta=0.002)
@@ -170,9 +150,7 @@ def test_single_update_no_cut():
     assert detector.drift_count == 0
 
 
-# ---------------------------------------------------------------------------
 # 11. warning_detected is always False (ADWIN has no warning zone)
-# ---------------------------------------------------------------------------
 
 def test_warning_detected_always_false():
     detector = ADWIN(delta=0.002)
@@ -181,9 +159,7 @@ def test_warning_detected_always_false():
     assert detector.warning_detected is False
 
 
-# ---------------------------------------------------------------------------
 # 12. drift_detected property reflects last update only
-# ---------------------------------------------------------------------------
 
 def test_drift_detected_property():
     rng = np.random.default_rng(7)

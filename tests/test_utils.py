@@ -16,9 +16,7 @@ from numcompute_stream.utils import (
 )
 
 
-# ---------------------------------------------------------------------------
 # check_array
-# ---------------------------------------------------------------------------
 
 class TestCheckArray:
     def test_valid_2d(self):
@@ -62,9 +60,7 @@ class TestCheckArray:
             check_array(np.ones(3), name="MyData")
 
 
-# ---------------------------------------------------------------------------
 # check_X_y
-# ---------------------------------------------------------------------------
 
 class TestCheckXy:
     def test_valid(self):
@@ -91,9 +87,7 @@ class TestCheckXy:
         assert X_out.shape == (2, 2)
 
 
-# ---------------------------------------------------------------------------
 # NaN helpers
-# ---------------------------------------------------------------------------
 
 class TestNanHelpers:
     def test_any_nan_true(self):
@@ -136,9 +130,7 @@ class TestNanHelpers:
             nan_row_mask(np.array([1.0, np.nan]))
 
 
-# ---------------------------------------------------------------------------
 # safe_divide
-# ---------------------------------------------------------------------------
 
 class TestSafeDivide:
     def test_normal_division(self):

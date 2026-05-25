@@ -10,9 +10,7 @@ import pytest
 from numcompute_stream.ensemble import OnlineRandomForestClassifier
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 def _make_separable(n=400, n_features=6, seed=0):
     """Two linearly separable Gaussian blobs."""
@@ -32,9 +30,7 @@ def _stream_fit(clf, X, y, chunk=50):
     return clf
 
 
-# ---------------------------------------------------------------------------
 # Construction
-# ---------------------------------------------------------------------------
 
 class TestConstruction:
     def test_defaults(self):
@@ -57,9 +53,7 @@ class TestConstruction:
             clf.partial_fit(X, y)
 
 
-# ---------------------------------------------------------------------------
 # Feature subsets
-# ---------------------------------------------------------------------------
 
 class TestFeatureSubsets:
     def test_sqrt_subset_size(self):
@@ -102,9 +96,7 @@ class TestFeatureSubsets:
             assert len(np.unique(subset)) == len(subset), "duplicate indices in subset"
 
 
-# ---------------------------------------------------------------------------
 # Partial fit
-# ---------------------------------------------------------------------------
 
 class TestPartialFit:
     def test_first_call_no_raise(self):
@@ -129,9 +121,7 @@ class TestPartialFit:
         assert clf.partial_fit(X, y) is clf
 
 
-# ---------------------------------------------------------------------------
 # Predict
-# ---------------------------------------------------------------------------
 
 class TestPredict:
     def test_predict_shape(self):
@@ -155,9 +145,7 @@ class TestPredict:
             clf.predict(X)
 
 
-# ---------------------------------------------------------------------------
 # predict_proba
-# ---------------------------------------------------------------------------
 
 class TestPredictProba:
     def test_proba_sums_to_one(self):
@@ -182,9 +170,7 @@ class TestPredictProba:
         assert (proba >= 0.0).all() and (proba <= 1.0).all()
 
 
-# ---------------------------------------------------------------------------
 # Voting consistency
-# ---------------------------------------------------------------------------
 
 class TestVoting:
     def test_hard_voting_majority(self):
@@ -227,9 +213,7 @@ class TestVoting:
         np.testing.assert_array_equal(clf.predict(X[:20]), expected)
 
 
-# ---------------------------------------------------------------------------
 # End-to-end accuracy
-# ---------------------------------------------------------------------------
 
 class TestEndToEnd:
     def test_ensemble_beats_or_ties_single_tree(self):
@@ -257,9 +241,7 @@ class TestEndToEnd:
         assert ens_acc.result() >= single_acc.result() - 0.02  # allow tiny tolerance
 
 
-# ---------------------------------------------------------------------------
 # OOB accuracy
-# ---------------------------------------------------------------------------
 
 class TestOOBAccuracy:
     def test_oob_list_length(self):
@@ -283,9 +265,7 @@ class TestOOBAccuracy:
         assert clf.oob_accuracy_ == []
 
 
-# ---------------------------------------------------------------------------
 # Reproducibility
-# ---------------------------------------------------------------------------
 
 class TestReproducibility:
     def test_same_seed_same_subsets(self):
@@ -319,9 +299,7 @@ class TestReproducibility:
         assert not all_same
 
 
-# ---------------------------------------------------------------------------
 # ARF drift detection (day 11)
-# ---------------------------------------------------------------------------
 
 def _make_abrupt_drift_stream(n_per_phase=1500, n_features=6, seed=0):
     """Return two phases: phase 1 label = X[:,0]>0, phase 2 label = X[:,0]<=0."""
