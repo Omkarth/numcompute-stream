@@ -39,9 +39,7 @@ class RunningStats:
         self._mean: np.ndarray | None = None
         self._M2: np.ndarray | None = None   # sum of squared deviations from mean
 
-    # ------------------------------------------------------------------
     # Public API
-    # ------------------------------------------------------------------
 
     def update(self, X: np.ndarray) -> "RunningStats":
         """Incorporate a new batch of observations.
@@ -107,9 +105,7 @@ class RunningStats:
         self._M2 = None
         return self
 
-    # ------------------------------------------------------------------
     # Properties
-    # ------------------------------------------------------------------
 
     @property
     def count(self) -> int:
@@ -158,9 +154,7 @@ class RunningStats:
         """Per-feature sample (unbiased) standard deviation."""
         return np.sqrt(self.var_unbiased)
 
-    # ------------------------------------------------------------------
     # Merging
-    # ------------------------------------------------------------------
 
     def merge(self, other: "RunningStats") -> "RunningStats":
         """Return a new RunningStats combining self and other (non-destructive).
@@ -192,9 +186,7 @@ class RunningStats:
         merged._count = n_combined
         return merged
 
-    # ------------------------------------------------------------------
     # Helpers
-    # ------------------------------------------------------------------
 
     def _require_data(self, name: str) -> None:
         if self._count == 0:
@@ -268,9 +260,7 @@ class StreamingHistogram:
             collections.deque() if max_samples is not None else None
         )
 
-    # ------------------------------------------------------------------
     # Public API
-    # ------------------------------------------------------------------
 
     def update(self, values: np.ndarray) -> "StreamingHistogram":
         """Incorporate new observations.
@@ -347,9 +337,7 @@ class StreamingHistogram:
         t = (q - lo_cdf) / (hi_cdf - lo_cdf)
         return float(bin_lo + t * (bin_hi - bin_lo))
 
-    # ------------------------------------------------------------------
     # Properties
-    # ------------------------------------------------------------------
 
     @property
     def bin_edges(self) -> np.ndarray:
@@ -371,9 +359,7 @@ class StreamingHistogram:
         """Number of observations currently tracked."""
         return int(self._counts.sum())
 
-    # ------------------------------------------------------------------
     # Helpers
-    # ------------------------------------------------------------------
 
     def _to_bin_indices(self, values: np.ndarray) -> np.ndarray:
         indices = np.floor((values - self._lo) / self._bin_width).astype(np.intp)

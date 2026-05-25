@@ -44,9 +44,7 @@ class StreamingConfusionMatrix(BaseMetric):
         self._fixed_n = n_classes
         self._reset_state()
 
-    # ------------------------------------------------------------------
     # BaseMetric
-    # ------------------------------------------------------------------
 
     def update(self, y_true: np.ndarray, y_pred: np.ndarray) -> "StreamingConfusionMatrix":
         """Increment matrix cells for one chunk of true/predicted label pairs."""
@@ -89,9 +87,7 @@ class StreamingConfusionMatrix(BaseMetric):
         self._reset_state()
         return self
 
-    # ------------------------------------------------------------------
     # Extra properties
-    # ------------------------------------------------------------------
 
     @property
     def classes_(self) -> list[int]:
@@ -103,9 +99,7 @@ class StreamingConfusionMatrix(BaseMetric):
         """Number of classes currently tracked."""
         return self._matrix.shape[0]
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
 
     def _reset_state(self) -> None:
         n = self._fixed_n
@@ -194,9 +188,7 @@ class PrecisionRecallF1(BaseMetric):
         self._cm.reset()
         return self
 
-    # ------------------------------------------------------------------
     # Per-class statistics
-    # ------------------------------------------------------------------
 
     def precision(self) -> np.ndarray:
         """Per-class precision, indexed by :attr:`~StreamingConfusionMatrix.classes_`."""
@@ -241,9 +233,7 @@ class PrecisionRecallF1(BaseMetric):
         denom = p + r
         return np.where(denom > 0, 2.0 * p * r / denom, 0.0)
 
-    # ------------------------------------------------------------------
     # Macro averages
-    # ------------------------------------------------------------------
 
     def macro_precision(self) -> float:
         """Macro-averaged precision."""

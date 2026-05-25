@@ -9,9 +9,7 @@ from collections.abc import Generator, Iterator
 import numpy as np
 
 
-# ---------------------------------------------------------------------------
 # CSV loading
-# ---------------------------------------------------------------------------
 
 def load_csv(
     path: str | pathlib.Path,
@@ -77,9 +75,7 @@ def load_csv(
     return X, y
 
 
-# ---------------------------------------------------------------------------
 # Train / test split
-# ---------------------------------------------------------------------------
 
 def train_test_split(
     X: np.ndarray,
@@ -123,9 +119,7 @@ def train_test_split(
     return X[train_idx], X[test_idx], y[train_idx], y[test_idx]
 
 
-# ---------------------------------------------------------------------------
 # Streaming chunk iterator
-# ---------------------------------------------------------------------------
 
 def stream_chunks(
     source: str | pathlib.Path | tuple[np.ndarray, np.ndarray],
@@ -175,9 +169,7 @@ def stream_chunks(
             break
 
 
-# ---------------------------------------------------------------------------
 # Line-by-line streaming (memory-efficient, no full load)
-# ---------------------------------------------------------------------------
 
 def stream_csv_rows(
     path: str | pathlib.Path,

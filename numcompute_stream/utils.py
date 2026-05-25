@@ -5,9 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 
-# ---------------------------------------------------------------------------
 # Array validation
-# ---------------------------------------------------------------------------
 
 def check_array(
     X: np.ndarray,
@@ -103,9 +101,7 @@ def check_X_y(
     return X, y
 
 
-# ---------------------------------------------------------------------------
 # NaN helpers
-# ---------------------------------------------------------------------------
 
 def any_nan(X: np.ndarray) -> bool:
     """Return True if X contains at least one NaN."""

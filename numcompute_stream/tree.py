@@ -11,9 +11,7 @@ from .base import BaseEstimator
 from .stats import RunningStats
 
 
-# ---------------------------------------------------------------------------
 # Impurity functions (scalar — used for parent node)
-# ---------------------------------------------------------------------------
 
 def _gini(class_counts: np.ndarray) -> float:
     """Gini impurity for a node with the given class-count vector."""
@@ -34,9 +32,7 @@ def _entropy(class_counts: np.ndarray) -> float:
     return float(-np.sum(p * np.log2(p)))
 
 
-# ---------------------------------------------------------------------------
 # Vectorised impurity (over candidate thresholds)
-# ---------------------------------------------------------------------------
 
 def _gini_vec(counts: np.ndarray) -> np.ndarray:
     """Gini impurity for each row of *counts* (shape ``(n_thresh, n_classes)``)."""
@@ -59,9 +55,7 @@ def _entropy_vec(counts: np.ndarray) -> np.ndarray:
     return result
 
 
-# ---------------------------------------------------------------------------
 # Hoeffding bound
-# ---------------------------------------------------------------------------
 
 def _hoeffding_bound(n: int, delta: float, criterion: str, n_classes: int) -> float:
     """Hoeffding bound ε = sqrt(R² · ln(1/δ) / (2n)).
@@ -75,9 +69,7 @@ def _hoeffding_bound(n: int, delta: float, criterion: str, n_classes: int) -> fl
     return float(np.sqrt(R ** 2 * np.log(1.0 / delta) / (2.0 * n)))
 
 
-# ---------------------------------------------------------------------------
 # Gaussian CDF (no scipy dependency)
-# ---------------------------------------------------------------------------
 
 _verf = np.frompyfunc(_math.erf, 1, 1)
 
@@ -87,9 +79,7 @@ def _normal_cdf(z: np.ndarray) -> np.ndarray:
     return 0.5 * (1.0 + _verf(z / _math.sqrt(2.0))).astype(np.float64)
 
 
-# ---------------------------------------------------------------------------
 # Candidate threshold generation
-# ---------------------------------------------------------------------------
 
 def _candidate_thresholds(
     leaf_stats: "LeafStats",
@@ -139,9 +129,7 @@ def _candidate_thresholds(
     return np.unique(thresholds) if thresholds else np.array([])
 
 
-# ---------------------------------------------------------------------------
 # Info-gain vectorised over candidate thresholds
-# ---------------------------------------------------------------------------
 
 def _info_gains_for_feature(
     leaf_stats: "LeafStats",
@@ -198,9 +186,7 @@ def _info_gains_for_feature(
     return np.where(valid, gains, 0.0)
 
 
-# ---------------------------------------------------------------------------
 # Leaf statistics
-# ---------------------------------------------------------------------------
 
 class LeafStats:
     """Sufficient statistics maintained at each tree leaf.
@@ -225,9 +211,7 @@ class LeafStats:
         # (feature_idx, class_label) → RunningStats for that feature's values
         self._feature_stats: Dict[Tuple[int, int], RunningStats] = {}
 
-    # ------------------------------------------------------------------
     # Mutation
-    # ------------------------------------------------------------------
 
     def update(self, x: np.ndarray, label: int) -> None:
         """Incorporate one sample *x* (shape ``(n_features,)``) with its label."""
@@ -243,9 +227,7 @@ class LeafStats:
                 self._feature_stats[key] = RunningStats(n_features=1)
             self._feature_stats[key].update(np.array([[val]]))
 
-    # ------------------------------------------------------------------
     # Queries
-    # ------------------------------------------------------------------
 
     @property
     def n_samples(self) -> int:
@@ -286,9 +268,7 @@ class LeafStats:
         )
 
 
-# ---------------------------------------------------------------------------
 # Tree node
-# ---------------------------------------------------------------------------
 
 class Node:
     """One node in the Hoeffding Tree.
@@ -343,9 +323,7 @@ class Node:
         )
 
 
-# ---------------------------------------------------------------------------
 # Hoeffding Tree classifier
-# ---------------------------------------------------------------------------
 
 class HoeffdingTreeClassifier(BaseEstimator):
     """Very Fast Decision Tree (VFDT) classifier.
@@ -405,9 +383,7 @@ class HoeffdingTreeClassifier(BaseEstimator):
         self._n_features: Optional[int] = None
         self._impurity_fn = _gini if criterion == "gini" else _entropy
 
-    # ------------------------------------------------------------------
     # BaseEstimator interface
-    # ------------------------------------------------------------------
 
     def partial_fit(
         self,
@@ -506,9 +482,7 @@ class HoeffdingTreeClassifier(BaseEstimator):
 
         return out
 
-    # ------------------------------------------------------------------
     # Tree structure introspection
-    # ------------------------------------------------------------------
 
     @property
     def tree_depth(self) -> int:
@@ -546,9 +520,7 @@ class HoeffdingTreeClassifier(BaseEstimator):
             return 1
         return 1 + self._count_nodes(node.left_child) + self._count_nodes(node.right_child)
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
 
     def _route_to_leaf(self, x: np.ndarray) -> Node:
         """Walk *x* down the tree and return its leaf node."""

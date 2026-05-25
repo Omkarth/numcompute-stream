@@ -41,9 +41,7 @@ class StandardScaler(BaseTransformer):
         self._mean: np.ndarray | None = None
         self._M2: np.ndarray | None = None       # sum of squared deviations
 
-    # ------------------------------------------------------------------
     # BaseTransformer
-    # ------------------------------------------------------------------
 
     def partial_fit(self, X: np.ndarray, y: np.ndarray | None = None) -> "StandardScaler":
         """Update running mean and variance with one chunk.
@@ -125,9 +123,7 @@ class StandardScaler(BaseTransformer):
             X[:, never_seen] = np.nan
         return X
 
-    # ------------------------------------------------------------------
     # Properties
-    # ------------------------------------------------------------------
 
     @property
     def mean_(self) -> np.ndarray:
@@ -184,9 +180,7 @@ class Imputer(BaseTransformer):
         self._mean: np.ndarray | None = None      # used by 'mean' only
         self._freq: list[dict] | None = None      # used by 'most_frequent' only
 
-    # ------------------------------------------------------------------
     # BaseTransformer
-    # ------------------------------------------------------------------
 
     def partial_fit(self, X: np.ndarray, y: np.ndarray | None = None) -> "Imputer":
         """Update running statistics with one chunk.
@@ -285,9 +279,7 @@ class Imputer(BaseTransformer):
 
         return X
 
-    # ------------------------------------------------------------------
     # Properties
-    # ------------------------------------------------------------------
 
     @property
     def strategy(self) -> str:
@@ -359,9 +351,7 @@ class OneHotEncoder(BaseTransformer):
         # One sorted list of known category values per input column.
         self._categories: list[list[float]] | None = None
 
-    # ------------------------------------------------------------------
     # BaseTransformer
-    # ------------------------------------------------------------------
 
     def partial_fit(self, X: np.ndarray, y: np.ndarray | None = None) -> "OneHotEncoder":
         """Update the known category sets from one chunk.
@@ -441,9 +431,7 @@ class OneHotEncoder(BaseTransformer):
             return np.empty((n_samples, 0), dtype=self._dtype)
         return np.concatenate(parts, axis=1)
 
-    # ------------------------------------------------------------------
     # Properties
-    # ------------------------------------------------------------------
 
     @property
     def categories_(self) -> list[list[float]]:

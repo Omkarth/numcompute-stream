@@ -62,9 +62,7 @@ class ADWIN(BaseDriftDetector):
         self._drift_count: int = 0
         self._drift_detected: bool = False
 
-    # ------------------------------------------------------------------
     # BaseDriftDetector interface
-    # ------------------------------------------------------------------
 
     def update(self, value: float) -> bool:
         """Append *value* to the window and test for drift.
@@ -145,9 +143,7 @@ class ADWIN(BaseDriftDetector):
         self._drift_count = 0
         return self
 
-    # ------------------------------------------------------------------
     # Additional properties
-    # ------------------------------------------------------------------
 
     @property
     def width(self) -> int:

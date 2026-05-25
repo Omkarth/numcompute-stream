@@ -138,9 +138,7 @@ class OnlineRandomForestClassifier(BaseEstimator):
         self._global_rng: Optional[np.random.Generator] = None
         self._chunk_counter: int = 0
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
 
     def _make_tree(self) -> HoeffdingTreeClassifier:
         return HoeffdingTreeClassifier(
@@ -184,9 +182,7 @@ class OnlineRandomForestClassifier(BaseEstimator):
                 )
             )
 
-    # ------------------------------------------------------------------
     # BaseEstimator interface
-    # ------------------------------------------------------------------
 
     def partial_fit(
         self,
@@ -387,9 +383,7 @@ class OnlineRandomForestClassifier(BaseEstimator):
         row_sums = np.where(row_sums == 0, 1.0, row_sums)
         return accum / row_sums
 
-    # ------------------------------------------------------------------
     # Introspection properties
-    # ------------------------------------------------------------------
 
     @property
     def oob_accuracy_(self) -> List[float]:
