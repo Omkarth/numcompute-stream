@@ -34,6 +34,7 @@ class StandardScaler(BaseTransformer):
     """
 
     def __init__(self, copy: bool = True) -> None:
+        """Initialise StandardScaler; see class docstring for parameter details."""
         self._copy = copy
         self._n_features: int | None = None
         self._n_seen: np.ndarray | None = None   # per-column valid-value count
@@ -172,6 +173,7 @@ class Imputer(BaseTransformer):
     """
 
     def __init__(self, strategy: Literal["mean", "most_frequent"] = "mean") -> None:
+        """Initialise Imputer; see class docstring for parameter details."""
         if strategy not in ("mean", "most_frequent"):
             raise ValueError(
                 f"strategy must be 'mean' or 'most_frequent'; got {strategy!r}"
@@ -289,6 +291,7 @@ class Imputer(BaseTransformer):
 
     @property
     def strategy(self) -> str:
+        """The imputation strategy: ``'mean'`` or ``'most_frequent'``."""
         return self._strategy
 
     @property
@@ -350,6 +353,7 @@ class OneHotEncoder(BaseTransformer):
     """
 
     def __init__(self, dtype: np.dtype = np.float64) -> None:
+        """Initialise OneHotEncoder; see class docstring for parameter details."""
         self._dtype = np.dtype(dtype)
         self._n_features: int | None = None
         # One sorted list of known category values per input column.

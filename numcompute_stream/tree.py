@@ -217,6 +217,7 @@ class LeafStats:
     """
 
     def __init__(self, n_features: int, grace_period: int = 200) -> None:
+        """Initialise LeafStats; see class docstring for parameter details."""
         self._n_features = n_features
         self._grace_period = grace_period
         self._n_samples: int = 0
@@ -253,6 +254,7 @@ class LeafStats:
 
     @property
     def class_counts(self) -> Dict[int, int]:
+        """Per-class sample count dictionary, keyed by integer label."""
         return dict(self._class_counts)
 
     @property
@@ -274,6 +276,7 @@ class LeafStats:
         )
 
     def get_feature_stats(self, feat_idx: int, label: int) -> Optional[RunningStats]:
+        """Return the RunningStats for (feat_idx, label), or None if unseen."""
         return self._feature_stats.get((feat_idx, label))
 
     def __repr__(self) -> str:
@@ -303,6 +306,7 @@ class Node:
         leaf_stats: Optional[LeafStats] = None,
         depth: int = 0,
     ) -> None:
+        """Initialise a leaf node; leaf_stats is None for internal nodes."""
         self.leaf_stats: Optional[LeafStats] = leaf_stats
         self.depth: int = depth
         self.split_feature: Optional[int] = None
@@ -312,6 +316,7 @@ class Node:
 
     @property
     def is_leaf(self) -> bool:
+        """True if no split has been assigned to this node."""
         return self.split_feature is None
 
     def to_internal(
@@ -385,6 +390,7 @@ class HoeffdingTreeClassifier(BaseEstimator):
         delta: float = 1e-7,
         tau: float = 0.05,
     ) -> None:
+        """Initialise the Hoeffding Tree; see class docstring for parameter details."""
         if criterion not in ("gini", "entropy"):
             raise ValueError(f"criterion must be 'gini' or 'entropy'; got {criterion!r}")
         self.criterion = criterion

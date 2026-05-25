@@ -46,6 +46,7 @@ class ADWIN(BaseDriftDetector):
         max_window_size: int = 5000,
         min_window_length: int = 10,
     ) -> None:
+        """Initialise the ADWIN detector; see class docstring for parameter details."""
         if delta <= 0 or delta >= 1:
             raise ValueError(f"delta must be in (0, 1); got {delta!r}")
         if max_window_size < 2 * min_window_length:

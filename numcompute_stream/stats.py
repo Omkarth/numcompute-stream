@@ -31,6 +31,7 @@ class RunningStats:
     """
 
     def __init__(self, n_features: int | None = None) -> None:
+        """Initialise RunningStats; see class docstring for parameter details."""
         if n_features is not None and n_features < 1:
             raise ValueError(f"n_features must be ≥ 1; got {n_features}")
         self._n_features = n_features
@@ -246,6 +247,7 @@ class StreamingHistogram:
         range: tuple[float, float],
         max_samples: int | None = None,
     ) -> None:
+        """Initialise StreamingHistogram; see class docstring for parameter details."""
         if n_bins < 1:
             raise ValueError(f"n_bins must be ≥ 1; got {n_bins}")
         lo, hi = float(range[0]), float(range[1])

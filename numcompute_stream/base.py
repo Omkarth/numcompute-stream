@@ -37,6 +37,7 @@ class BaseTransformer(abc.ABC):
         """
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray | None = None) -> np.ndarray:
+        """Fit on X then transform it; convenience shortcut for partial_fit + transform."""
         return self.partial_fit(X, y).transform(X)
 
 

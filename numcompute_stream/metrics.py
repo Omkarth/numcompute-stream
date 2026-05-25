@@ -38,6 +38,7 @@ class StreamingConfusionMatrix(BaseMetric):
     """
 
     def __init__(self, n_classes: int | None = None) -> None:
+        """Initialise the confusion matrix; see class docstring for parameter details."""
         if n_classes is not None and n_classes < 2:
             raise ValueError(f"n_classes must be ≥ 2; got {n_classes}")
         self._fixed_n = n_classes
@@ -48,6 +49,7 @@ class StreamingConfusionMatrix(BaseMetric):
     # ------------------------------------------------------------------
 
     def update(self, y_true: np.ndarray, y_pred: np.ndarray) -> "StreamingConfusionMatrix":
+        """Increment matrix cells for one chunk of true/predicted label pairs."""
         y_true, y_pred = _validate(y_true, y_pred)
         if y_true.size == 0:
             return self
@@ -83,6 +85,7 @@ class StreamingConfusionMatrix(BaseMetric):
         return self._matrix.copy()
 
     def reset(self) -> "StreamingConfusionMatrix":
+        """Clear all accumulated counts; returns self."""
         self._reset_state()
         return self
 
@@ -127,9 +130,11 @@ class Accuracy(BaseMetric):
     """
 
     def __init__(self, n_classes: int | None = None) -> None:
+        """Initialise accuracy metric backed by a StreamingConfusionMatrix."""
         self._cm = StreamingConfusionMatrix(n_classes=n_classes)
 
     def update(self, y_true: np.ndarray, y_pred: np.ndarray) -> "Accuracy":
+        """Incorporate one chunk of true/predicted labels into the confusion matrix."""
         self._cm.update(y_true, y_pred)
         return self
 
@@ -142,6 +147,7 @@ class Accuracy(BaseMetric):
         return float(np.trace(mat) / total)
 
     def reset(self) -> "Accuracy":
+        """Clear all accumulated state; returns self."""
         self._cm.reset()
         return self
 
@@ -170,10 +176,12 @@ class PrecisionRecallF1(BaseMetric):
         n_classes: int | None = None,
         warn_zero_division: bool = True,
     ) -> None:
+        """Initialise PrecisionRecallF1; see class docstring for parameter details."""
         self._cm = StreamingConfusionMatrix(n_classes=n_classes)
         self._warn = warn_zero_division
 
     def update(self, y_true: np.ndarray, y_pred: np.ndarray) -> "PrecisionRecallF1":
+        """Incorporate one chunk of true/predicted labels into the confusion matrix."""
         self._cm.update(y_true, y_pred)
         return self
 
@@ -182,6 +190,7 @@ class PrecisionRecallF1(BaseMetric):
         return self.macro_f1()
 
     def reset(self) -> "PrecisionRecallF1":
+        """Clear all accumulated state; returns self."""
         self._cm.reset()
         return self
 
@@ -275,6 +284,7 @@ class RollingMetric(BaseMetric):
     """
 
     def __init__(self, base_metric: BaseMetric, window_size: int) -> None:
+        """Initialise the rolling wrapper; see class docstring for parameter details."""
         if window_size < 1:
             raise ValueError(f"window_size must be ≥ 1; got {window_size}")
         self._metric = base_metric
@@ -282,6 +292,7 @@ class RollingMetric(BaseMetric):
         self._window: collections.deque[tuple[np.ndarray, np.ndarray]] = collections.deque()
 
     def update(self, y_true: np.ndarray, y_pred: np.ndarray) -> "RollingMetric":
+        """Buffer one chunk; evict the oldest chunk when window_size is exceeded."""
         y_true, y_pred = _validate(y_true, y_pred)
         if y_true.size == 0:
             return self
@@ -298,6 +309,7 @@ class RollingMetric(BaseMetric):
         return self._metric.result()
 
     def reset(self) -> "RollingMetric":
+        """Clear the buffer and reset the wrapped metric; returns self."""
         self._window.clear()
         self._metric.reset()
         return self
@@ -322,6 +334,7 @@ class StreamingAUC(BaseMetric):
     """
 
     def __init__(self, window_size: int = 10_000) -> None:
+        """Initialise the AUC accumulator; see class docstring for parameter details."""
         if window_size < 1:
             raise ValueError(f"window_size must be ≥ 1; got {window_size}")
         self._window_size = window_size
@@ -388,6 +401,7 @@ class StreamingAUC(BaseMetric):
         return float(np.trapezoid(tpr, fpr))
 
     def reset(self) -> "StreamingAUC":
+        """Clear the score and label buffers; returns self."""
         self._scores.clear()
         self._labels.clear()
         return self

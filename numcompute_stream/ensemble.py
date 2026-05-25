@@ -49,6 +49,7 @@ class _TreeState:
         warning_adwin: Optional[ADWIN] = None,
         drift_adwin: Optional[ADWIN] = None,
     ) -> None:
+        """Bundle mutable per-tree state into a single object."""
         self.tree = tree
         self.feature_subset = feature_subset
         self.oob_metric = oob_metric
@@ -114,6 +115,7 @@ class OnlineRandomForestClassifier(BaseEstimator):
         warning_delta: float = 0.01,
         drift_delta: float = 0.001,
     ) -> None:
+        """Initialise the forest; see class docstring for parameter descriptions."""
         if voting not in ("hard", "soft"):
             raise ValueError(f"voting must be 'hard' or 'soft'; got {voting!r}")
         self.n_estimators = n_estimators
@@ -192,6 +194,18 @@ class OnlineRandomForestClassifier(BaseEstimator):
         y: np.ndarray,
         classes: Optional[np.ndarray] = None,
     ) -> "OnlineRandomForestClassifier":
+        """Update all trees in the ensemble with one chunk using Poisson bootstrap.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+        y : ndarray of shape (n_samples,) — integer class labels
+        classes : 1-D array of all possible class labels, required on first call
+
+        Returns
+        -------
+        self
+        """
         X = np.asarray(X, dtype=np.float64)
         y = np.asarray(y, dtype=np.int64)
         if X.ndim == 1:
@@ -294,6 +308,16 @@ class OnlineRandomForestClassifier(BaseEstimator):
                 state.oob_metric.reset()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predict class labels using hard or soft voting across all trees.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+
+        Returns
+        -------
+        ndarray of shape (n_samples,) — predicted integer class labels
+        """
         if self._states is None:
             raise ValueError("Call partial_fit before predict.")
 
@@ -322,6 +346,16 @@ class OnlineRandomForestClassifier(BaseEstimator):
         return self._classes[np.argmax(votes, axis=1)]
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Predict class probabilities by averaging tree probability outputs.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+
+        Returns
+        -------
+        ndarray of shape (n_samples, n_classes) — row-normalised probability estimates
+        """
         if self._states is None:
             raise ValueError("Call partial_fit before predict_proba.")
 
