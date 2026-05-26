@@ -11,7 +11,9 @@ from .metrics import (
     StreamingAUC,
     StreamingConfusionMatrix,
 )
+from .pipeline import Pipeline
 from .preprocessing import Imputer, OneHotEncoder, StandardScaler
+from .stream import StreamTrainer
 from .tree import HoeffdingTreeClassifier
 
 __all__ = [
@@ -21,9 +23,11 @@ __all__ = [
     "Imputer",
     "OneHotEncoder",
     "OnlineRandomForestClassifier",
+    "Pipeline",
     "PrecisionRecallF1",
     "RollingMetric",
     "StandardScaler",
     "StreamingAUC",
     "StreamingConfusionMatrix",
+    "StreamTrainer",
 ]
