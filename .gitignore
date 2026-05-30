@@ -53,3 +53,4 @@ benchmark/results/
 report/
 *.mp4
 *.mov
+.venv*/
