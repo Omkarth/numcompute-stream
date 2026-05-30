@@ -47,7 +47,19 @@ class StreamingConfusionMatrix(BaseMetric):
     # BaseMetric
 
     def update(self, y_true: np.ndarray, y_pred: np.ndarray) -> "StreamingConfusionMatrix":
-        """Increment matrix cells for one chunk of true/predicted label pairs."""
+        """Increment matrix cells for one chunk of true/predicted label pairs.
+
+        Parameters
+        ----------
+        y_true : array-like of int
+            Ground-truth class labels.
+        y_pred : array-like of int
+            Predicted class labels.
+
+        Returns
+        -------
+        self
+        """
         y_true, y_pred = _validate(y_true, y_pred)
         if y_true.size == 0:
             return self

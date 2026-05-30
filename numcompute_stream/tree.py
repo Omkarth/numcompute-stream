@@ -395,6 +395,16 @@ class HoeffdingTreeClassifier(BaseEstimator):
 
         A split is evaluated at a leaf every *grace_period* samples routed to
         that leaf.  Whether the split fires depends on the Hoeffding bound.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+        y : ndarray of shape (n_samples,) — integer class labels
+        classes : 1-D array of all possible class labels, required on first call
+
+        Returns
+        -------
+        self
         """
         X = np.asarray(X, dtype=np.float64)
         y = np.asarray(y, dtype=np.int64)
@@ -439,7 +449,16 @@ class HoeffdingTreeClassifier(BaseEstimator):
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """Return the majority-class label for each sample in *X*."""
+        """Return the majority-class label for each sample in *X*.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+
+        Returns
+        -------
+        ndarray of shape (n_samples,) — predicted integer class labels
+        """
         if self._root is None:
             raise ValueError("Call partial_fit before predict.")
 
