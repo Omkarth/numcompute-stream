@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `feat(pipeline)`: `Pipeline` — chained transformers + estimator with `partial_fit`/`predict`/`transform`
+- `feat(pipeline)`: `StreamTrainer` — prequential (test-then-train) evaluation with per-chunk metric logging and optional memory tracking
+- `feat(visualise)`: `plot_metric_over_time`, `compare_models`, `plot_predictions_vs_ground_truth`, `plot_confusion_matrix` plotting utilities
+- `demo`: `stream_demo.ipynb` comparing single Hoeffding Tree, Online RF, and Adaptive RF on a synthetic concept-drift stream
+- `bench`: loop-vs-vectorised performance comparisons for `RunningStats`, `StandardScaler`, and info-gain (260×, 55×, 5.5× speedups)
+
+### Fixed
+- `fix(demo)`: set `max_features=6` in the demo notebook so the Online RF outperforms a single tree on the Electricity dataset
+
+### Changed
+- `style`: simplified section-separator comments in source and test files
+- `docs`: expanded README with corrected quickstart, full module table, Benchmarks section, and tightened Design Highlights
+- `docs`: promoted one-liner docstrings to Args/Returns format on `HoeffdingTreeClassifier.partial_fit`, `HoeffdingTreeClassifier.predict`, and `StreamingConfusionMatrix.update`
+
+---
+
+### Historical (days 1–12)
+
 - `chore`: init repo structure, `pyproject.toml`, `.gitignore`
 - `feat(base)`: abstract base classes — `BaseTransformer`, `BaseEstimator`, `BaseMetric`, `BaseDriftDetector`
 - `feat(io)`: `CSVLoader`, `train_test_split`, `stream_chunks` chunk iterator
