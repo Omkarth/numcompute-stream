@@ -19,6 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `style`: simplified section-separator comments in source and test files
 - `docs`: expanded README with corrected quickstart, full module table, Benchmarks section, and tightened Design Highlights
 - `docs`: promoted one-liner docstrings to Args/Returns format on `HoeffdingTreeClassifier.partial_fit`, `HoeffdingTreeClassifier.predict`, and `StreamingConfusionMatrix.update`
+- `chore`: gitignore all `.venv*` variants to keep accidentally-created environments out of the repo
 
 ---
 
