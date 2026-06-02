@@ -55,3 +55,5 @@ report/
 *.mov
 .venv*/
 demo/stream_demo_recording.ipynb
+demo/*.mp4
+demo/demo_video.mp4
