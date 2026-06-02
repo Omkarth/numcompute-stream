@@ -1,6 +1,6 @@
 # numcompute-stream: Technical Report
 
-University of Adelaide — NumCompute Assignment 2.2
+Adelaide University — NumCompute Assignment 2.2
 
 ---
 

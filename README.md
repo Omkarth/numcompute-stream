@@ -1,7 +1,7 @@
 # numcompute-stream
 
 A streaming machine learning framework built from scratch with NumPy.
-University of Adelaide — NumCompute Assignment 2.2.
+Adelaide University — NumCompute Assignment 2.2.
 
 ## Features
 
