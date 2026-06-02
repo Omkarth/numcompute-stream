@@ -143,7 +143,3 @@ Full methodology and analysis: [`benchmark/results.md`](benchmark/results.md).
 - **Numeric features only** — categorical features must be encoded (e.g. `OneHotEncoder`) before fitting.
 - **Binary-only AUC** — `StreamingAUC` supports only binary classification (`y ∈ {0, 1}`).
 - **No serialisation** — fitted models cannot be saved to disk; all state lives in memory.
-
-## License
-
-MIT
