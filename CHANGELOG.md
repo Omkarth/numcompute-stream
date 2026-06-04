@@ -23,7 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-### Historical (days 1–12)
+### Historical
 
 - `chore`: init repo structure, `pyproject.toml`, `.gitignore`
 - `feat(base)`: abstract base classes — `BaseTransformer`, `BaseEstimator`, `BaseMetric`, `BaseDriftDetector`
