@@ -69,6 +69,17 @@ print(f"Final accuracy: {acc.result():.4f}")
 | `stream.py` | `StreamTrainer` — prequential (test-then-train) evaluation over a chunk iterator |
 | `visualise.py` | `plot_metric_over_time`, `compare_models`, `plot_predictions_vs_ground_truth`, `plot_confusion_matrix` |
 
+### Name Mapping with Assignment Specification
+
+The assignment spec uses generic class names that this implementation realises with the streaming-appropriate, specific variants documented in the original literature:
+
+| Spec name | Implementation | Reason |
+|-----------|----------------|--------|
+| `DecisionTreeClassifier` | `HoeffdingTreeClassifier` | The streaming variant of a decision tree (Domingos & Hulten, 2000) |
+| `EnsembleClassifier` | `OnlineRandomForestClassifier` | A specific ensemble using Poisson(1) bagging (Oza & Russell, 2001) and OOB tracking |
+
+Both implementations satisfy the spec's functional requirements through the `.partial_fit()` and `.predict()` interfaces. The more specific names are used in the codebase to reflect that these are not generic batch classifiers ported to streaming, but algorithms designed from first principles for streaming data.
+
 ## Running Tests
 
 ```bash
